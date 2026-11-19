@@ -55,6 +55,7 @@ stack:
 | House format + check that repairs bad data | M |
 | 3D view built from the house: walls, openings, rooms, balcony, roof areas, kitchen, items | L |
 | Orbit camera + top view | S |
+| Walk inside: clickable dots (one per room), 360° look-around at 1.65 m eye height | S |
 | Drag loose items (snap, kept inside walls), fixed elements can't be dragged | M |
 | Undo / Redo / Reset / Escape | S |
 | Item agent (URL or text) with Accept/Reject proposal | M |
@@ -68,7 +69,7 @@ stack:
 
 ### COULD
 - Product photo as the box's front texture
-- Walk-through camera, sun position
+- Sun position
 - Floor plan PDF shown under the 2D view
 
 ### WON'T (this release)
@@ -187,6 +188,8 @@ my-future-house/
 **US-6 Renovate.** Given "תוסיף פרגולה מעל חצי מהמרפסת" or "תוריד את הקיר בין המטבח לסלון", a before/after preview and a plain-words list of the changes are shown. Accept is one undo step. Edits that point to a missing wall or room are rejected with a message.
 
 **US-7 Persist.** Autosave on every commit. Export/Import JSON passes through the check.
+
+**US-8 Walk inside.** Given the 3D view, when he clicks "כניסה לדירה", then the camera stands at 1.65 m (an average man's eye height) at the entrance room's dot, and dragging turns the view 360°. Clicking a visible dot on the floor of another room (or the balcony) moves him there. Escape returns to the orbit view. Walk mode never changes the house.
 
 ## Success Metrics
 | Metric | Target |
