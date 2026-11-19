@@ -1,3 +1,4 @@
+import './styles.css';
 import { createRoot } from 'react-dom/client';
 import { Editor } from './pages/Editor';
 import { Entry } from './pages/Entry';

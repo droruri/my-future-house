@@ -41,6 +41,8 @@ Before finishing a change, run `pnpm lint && pnpm typecheck && pnpm test`.
 
 ## Conventions
 
+- Styling: UI is styled with Tailwind utilities using the theme tokens in `src/styles.css`; no inline
+  `style={{}}` except dynamic values (e.g. three.js mount sizing).
 - TypeScript `strict` + `noUncheckedIndexedAccess`. No non-null assertions (`!`) and no lying
   `as` casts — narrow with real checks.
 - Every boundary is parsed, not trusted: request bodies, env vars, AI output, fetched pages,

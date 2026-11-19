@@ -36,7 +36,7 @@ export function Plan2D({ house }: { house: House }) {
       role="img"
       aria-label="תוכנית דו־ממדית"
       viewBox={`${b.minX - PAD} ${b.minZ - PAD} ${w + 2 * PAD} ${d + 2 * PAD}`}
-      style={{ width: '100%', height: '100%', background: '#fff' }}
+      className="h-full w-full bg-surface"
     >
       {house.rooms.map((r) => (
         <polygon key={r.id} points={pts(r.polygon)} fill={ROOM_FILL[r.kind]} stroke="none" />

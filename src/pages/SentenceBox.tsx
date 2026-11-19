@@ -33,21 +33,27 @@ export function SentenceBox(props: {
   };
 
   return (
-    <section aria-label="תיקון במשפט" style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #ccc', paddingTop: 8 }}>
-      <strong>{props.title ?? 'שיפוץ במשפט'}</strong>
+    <section aria-label="תיקון במשפט" className="card flex flex-col gap-2 p-4">
+      <h2 className="m-0 text-base font-bold">{props.title ?? 'שיפוץ במשפט'}</h2>
       <textarea
         value={input}
         onChange={(e) => setInput(e.target.value)}
         placeholder={props.placeholder ?? 'למשל: תוריד את הקיר בין המטבח לסלון'}
         rows={3}
+        className="field"
       />
-      <button onClick={onSend} disabled={busy || !input.trim()}>{busy ? 'חושב…' : 'הצג שינוי'}</button>
-      {msg && <div role="alert">{msg}</div>}
+      <button onClick={onSend} disabled={busy || !input.trim()} className="btn btn-primary">
+        {busy && <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4 animate-spin" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="9" opacity=".25" /><path d="M21 12a9 9 0 0 0-9-9" strokeLinecap="round" /></svg>}
+        {busy ? 'חושב…' : 'הצג שינוי'}
+      </button>
+      {msg && <div role="alert" className="rounded-md bg-warn-bg p-2 text-sm">{msg}</div>}
       {preview && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <ul style={{ margin: 0, paddingInlineStart: 18 }}>{preview.changes.map((c, i) => <li key={i}>{c}</li>)}</ul>
-          <button onClick={() => { onAccept(preview); setInput(''); setMsg(null); }}>אישור</button>
-          <button onClick={() => { onPreview(null); setMsg(null); }}>דחייה</button>
+        <div className="flex flex-col gap-2">
+          <ul className="m-0 rounded-md bg-info-bg p-2 ps-6 text-sm text-muted-fg">{preview.changes.map((c, i) => <li key={i}>{c}</li>)}</ul>
+          <div className="flex gap-2">
+            <button className="btn btn-primary flex-1" onClick={() => { onAccept(preview); setInput(''); setMsg(null); }}>אישור</button>
+            <button className="btn btn-ghost flex-1" onClick={() => { onPreview(null); setMsg(null); }}>דחייה</button>
+          </div>
         </div>
       )}
     </section>
