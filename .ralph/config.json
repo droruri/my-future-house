@@ -1,5 +1,12 @@
 {
   "$schema": "./config.schema.json",
   "repo": "droruri/my-future-house",
-  "specDoc": "project-documentation/01-requirements/product-requirements.md"
+  "specDoc": "project-documentation/01-requirements/product-requirements.md",
+  "commands": {
+    "install": "pnpm install --frozen-lockfile",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "diffExclude": [
+      "pnpm-lock.yaml"
+    ]
+  }
 }
