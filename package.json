@@ -5,7 +5,7 @@
   "version": "0.0.0",
   "packageManager": "pnpm@12.6.0",
   "scripts": {
-    "dev": "concurrently -n web,server \"vite\" \"tsx watch server/index.ts\"",
+    "dev": "concurrently -n web,server \"vite\" \"tsx watch --env-file-if-exists=.env server/index.ts\"",
     "build": "vite build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
