@@ -246,7 +246,8 @@ export function mountScene(
     const id = hit?.object.userData['itemId'];
     const item = typeof id === 'string' ? house.items.find((i) => i.id === id) : undefined;
     if (!item) {
-      cb.onSelect(null);
+      // Walls, openings, kitchen, balcony: do nothing. Only empty space clears the selection.
+      if (!hit) cb.onSelect(null);
       return;
     }
     const p = new THREE.Vector3();
