@@ -60,4 +60,34 @@ describe('validateHouse', () => {
     expect(r.repairs).toContain('item i: width clamped');
     expect(r.repairs).toContain('item i: depth clamped');
   });
+  it('clamps opening size to its wall', () => {
+    const h = base();
+    h.openings = [
+      { id: 'o', wallId: 'n', kind: 'window', offset: 0, width: 99, height: 99, sill: 5 },
+    ];
+    const o = repaired(h).house.openings[0];
+    expect(o?.width).toBe(10);
+    expect(o?.height).toBe(2.6);
+    expect(o?.sill).toBe(0);
+    expect(repaired(h).repairs).toContain('opening o: size clamped');
+  });
+  it('clamps roof height and kitchen counter height, drops unusable polygons', () => {
+    const h = base();
+    h.roofs = [
+      { id: 'roof', polygon: [{ x: 0, z: 0 }, { x: 1, z: 0 }, { x: 1, z: 1 }, { x: 0, z: 1 }], height: 40, kind: 'solid' },
+      { id: 'bad-roof', polygon: [{ x: 0, z: 0 }], height: 2, kind: 'pergola' },
+    ];
+    h.kitchen = {
+      polygon: [{ x: 0, z: 0 }, { x: 2, z: 0 }, { x: 2, z: 2 }],
+      counterHeight: 3,
+      hasIsland: false,
+    };
+    const r = repaired(h);
+    expect(r.house.roofs.map((x) => x.id)).toEqual(['roof']);
+    expect(r.house.roofs[0]?.height).toBe(6);
+    expect(r.house.kitchen?.counterHeight).toBe(1.2);
+    expect(r.repairs).toContain('roof roof: height clamped');
+    expect(r.repairs).toContain('kitchen: counterHeight clamped');
+    expect(r.repairs).toContain('roof bad-roof: dropped (fewer than 3 points)');
+  });
 });
