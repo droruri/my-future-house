@@ -1,0 +1,5 @@
+{
+  "$schema": "./config.schema.json",
+  "repo": "droruri/my-future-house",
+  "specDoc": "project-documentation/01-requirements/product-requirements.md"
+}

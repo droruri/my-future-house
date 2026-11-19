@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "repo": {
+      "type": "string",
+      "pattern": "^[\\w.-]+\\/[\\w.-]+$"
+    },
+    "labels": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "pickLabel": {
+          "default": "ready-for-agent",
+          "type": "string"
+        },
+        "blocked": {
+          "default": "blocked",
+          "type": "string",
+          "minLength": 1
+        },
+        "needsHuman": {
+          "default": "needs-human",
+          "type": "string",
+          "minLength": 1
+        },
+        "lock": {
+          "default": "ralph:running",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "models": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "build": {
+          "default": "sonnet",
+          "type": "string",
+          "minLength": 1
+        },
+        "review": {
+          "default": "haiku",
+          "type": "string",
+          "minLength": 1
+        },
+        "merge": {
+          "default": "haiku",
+          "type": "string",
+          "minLength": 1
+        },
+        "escalation": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "phases": {
+      "default": [
+        "build",
+        "review",
+        "merge"
+      ],
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "build",
+          "review",
+          "merge"
+        ]
+      }
+    },
+    "smallDiffLines": {
+      "default": 150,
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "commands": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "install": {
+          "default": "",
+          "type": "string"
+        },
+        "check": {
+          "default": "",
+          "type": "string"
+        },
+        "diffExclude": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[^'\\n]+$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "specDoc": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subagents": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "investigator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "planner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewer": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "minLength": 1
+            },
+            "parallel": {
+              "default": 1,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        "browserCheck": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "skills": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "tdd": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plan": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "plugins": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "merge": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "method": {
+          "default": "squash",
+          "type": "string",
+          "enum": [
+            "squash",
+            "merge",
+            "rebase"
+          ]
+        },
+        "auto": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "repo"
+  ],
+  "additionalProperties": false
+}
