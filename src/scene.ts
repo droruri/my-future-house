@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { House, Pt } from './house';
+import type { House, Item, Pt } from './house';
 import { moveItem, placeItem } from './edit';
 import { openSides, slatSpans, wallRects } from './geometry';
 
@@ -63,7 +63,7 @@ const centroid = (poly: Pt[]): Pt => {
 };
 
 /** Build the 3D group for a house. */
-export function buildHouse(house: House, selectedId: string | null = null): THREE.Group {
+export function buildHouse(house: House, selectedId: string | null = null, proposal: Item | null = null): THREE.Group {
   const group = new THREE.Group();
   const wallMat = new THREE.MeshStandardMaterial({ color: 0xf2efe9 });
   const glassMat = new THREE.MeshStandardMaterial({ color: 0x9ccbe8, transparent: true, opacity: 0.35 });
@@ -164,13 +164,29 @@ export function buildHouse(house: House, selectedId: string | null = null): THRE
     label.position.set(it.pos.x, it.size.h + 0.3, it.pos.z);
     group.add(label);
   }
+
+  if (proposal) {
+    const ghost = new THREE.Mesh(
+      new THREE.BoxGeometry(proposal.size.w, proposal.size.h, proposal.size.d),
+      new THREE.MeshStandardMaterial({ color: new THREE.Color(proposal.color), transparent: true, opacity: 0.45, depthWrite: false }),
+    );
+    ghost.position.set(proposal.pos.x, proposal.size.h / 2, proposal.pos.z);
+    ghost.rotation.y = -THREE.MathUtils.degToRad(proposal.rotation);
+    group.add(tag(ghost, 'proposal'));
+    const { w, d, h } = proposal.size;
+    const cm = (v: number) => Math.round(v * 100);
+    const price = proposal.price !== undefined ? ` · ₪${proposal.price}` : '';
+    const label = makeLabel(`${proposal.name} ${cm(w)}×${cm(d)}×${cm(h)}${price}`, 'proposal-label', 1.6);
+    label.position.set(proposal.pos.x, h + 0.3, proposal.pos.z);
+    group.add(label);
+  }
   return group;
 }
 
 export type SceneHandle = {
   dispose: () => void;
   setView: (v: 'orbit' | 'top') => void;
-  setHouse: (house: House, selectedId: string | null) => void;
+  setHouse: (house: House, selectedId: string | null, proposal?: Item | null) => void;
 };
 
 export type SceneCallbacks = {
@@ -194,6 +210,7 @@ export function mountScene(
 
   let house = initial;
   let selected: string | null = null;
+  let ghost: Item | null = null;
   let built: THREE.Group | null = null;
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -209,7 +226,7 @@ export function mountScene(
         }
       });
     }
-    built = buildHouse(h, selected);
+    built = buildHouse(h, selected, ghost);
     scene.add(built);
     render();
   };
@@ -304,9 +321,10 @@ export function mountScene(
   resize();
   return {
     setView,
-    setHouse: (h, sel) => {
+    setHouse: (h, sel, proposal = null) => {
       house = h;
       selected = sel;
+      ghost = proposal;
       drag = null;
       controls.enabled = true;
       rebuild(h);

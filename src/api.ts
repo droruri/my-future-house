@@ -29,3 +29,37 @@ export async function parseDocuments(files: File[]): Promise<ParseOutcome> {
     return { ok: false, error: 'אין חיבור לשרת', skipped: [] };
   }
 }
+
+const Draft = z.object({
+  name: z.string(),
+  size: z.object({ w: z.number().nullable(), d: z.number().nullable(), h: z.number().nullable() }),
+  color: z.string(),
+  price: z.number().optional(),
+  url: z.string().optional(),
+  room: z.string().optional(),
+});
+export type ItemDraft = z.infer<typeof Draft>;
+
+export type ItemOutcome =
+  | { ok: true; status: 'found' | 'needs_dimensions'; item: ItemDraft }
+  | { ok: false; error: string };
+
+const ItemBody = z.union([
+  z.object({ ok: z.literal(true), status: z.enum(['found', 'needs_dimensions']), item: Draft }),
+  z.object({ ok: z.literal(false), error: z.string() }),
+]);
+
+/** Ask the item agent. Never throws. */
+export async function requestItem(input: { url?: string; text?: string; rooms: string[] }): Promise<ItemOutcome> {
+  try {
+    const res = await fetch('/api/item', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const body = ItemBody.safeParse(await res.json());
+    return body.success ? body.data : { ok: false, error: 'תשובה לא תקינה מהשרת' };
+  } catch {
+    return { ok: false, error: 'אין חיבור לשרת' };
+  }
+}
