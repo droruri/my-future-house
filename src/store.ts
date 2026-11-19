@@ -6,6 +6,7 @@ import { loadSaved, parseImport, save } from './persist';
 import { deleteItem, rotateItem } from './edit';
 import { acceptProposal } from './proposal';
 import type { Item } from './house';
+import type { Preview } from './pages/SentenceBox';
 
 type State = H.History & {
   page: 'entry' | 'editor';
@@ -22,6 +23,9 @@ type State = H.History & {
   proposal: Item | null;
   propose: (item: Item | null) => void;
   acceptProposal: () => void;
+  renovation: Preview | null;
+  previewRenovation: (p: Preview | null) => void;
+  acceptRenovation: () => void;
   rotateSelected: () => void;
   deleteSelected: () => void;
 };
@@ -45,7 +49,7 @@ export const useStore = create<State>((set, get) => ({
   ...initial,
   // No saved house yet: the app opens on the documents page.
   page: saved ? 'editor' : 'entry',
-  confirmHouse: (house) => set({ ...H.createHistory(house), selectedId: null, proposal: null, page: 'editor' }),
+  confirmHouse: (house) => set({ ...H.createHistory(house), selectedId: null, proposal: null, renovation: null, page: 'editor' }),
   selectedId: null,
   notice: saved && saved.repairs.length > 0 ? `הבית השמור תוקן: ${saved.repairs.join('; ')}` : null,
   dismissNotice: () => set({ notice: null }),
@@ -71,6 +75,12 @@ export const useStore = create<State>((set, get) => ({
   acceptProposal: () => {
     const { proposal } = get();
     if (proposal) set((s) => ({ ...H.commit(pick(s), acceptProposal(s.house, proposal)), proposal: null }));
+  },
+  renovation: null,
+  previewRenovation: (renovation) => set({ renovation }),
+  acceptRenovation: () => {
+    const { renovation } = get();
+    if (renovation) set((s) => ({ ...H.commit(pick(s), renovation.house), renovation: null, selectedId: null }));
   },
   rotateSelected: () => {
     const { selectedId, house } = get();

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { HouseSchema, validateHouse, type House } from './house';
+import { EditSchema, HouseSchema, validateHouse, type Edit, type House } from './house';
 
 export type ParseOutcome =
   | { ok: true; house: House; repairs: string[]; skipped: string[] }
@@ -58,6 +58,26 @@ export async function requestItem(input: { url?: string; text?: string; rooms: s
       body: JSON.stringify(input),
     });
     const body = ItemBody.safeParse(await res.json());
+    return body.success ? body.data : { ok: false, error: 'תשובה לא תקינה מהשרת' };
+  } catch {
+    return { ok: false, error: 'אין חיבור לשרת' };
+  }
+}
+
+const EditBody = z.union([
+  z.object({ ok: z.literal(true), edits: z.array(EditSchema) }),
+  z.object({ ok: z.literal(false), error: z.string() }),
+]);
+
+/** Ask the renovation agent for edits. Never throws. */
+export async function requestEdits(house: House, request: string): Promise<{ ok: true; edits: Edit[] } | { ok: false; error: string }> {
+  try {
+    const res = await fetch('/api/edit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ house, request }),
+    });
+    const body = EditBody.safeParse(await res.json());
     return body.success ? body.data : { ok: false, error: 'תשובה לא תקינה מהשרת' };
   } catch {
     return { ok: false, error: 'אין חיבור לשרת' };
