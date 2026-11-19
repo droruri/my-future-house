@@ -6,6 +6,8 @@ import { loadSaved, parseImport, save } from './persist';
 import { deleteItem, rotateItem } from './edit';
 
 type State = H.History & {
+  page: 'entry' | 'editor';
+  confirmHouse: (house: House) => void;
   selectedId: string | null;
   commit: (house: House) => void;
   undo: () => void;
@@ -36,6 +38,9 @@ const initial: H.History = saved
 
 export const useStore = create<State>((set, get) => ({
   ...initial,
+  // No saved house yet: the app opens on the documents page.
+  page: saved ? 'editor' : 'entry',
+  confirmHouse: (house) => set({ ...H.createHistory(house), selectedId: null, page: 'editor' }),
   selectedId: null,
   notice: saved && saved.repairs.length > 0 ? `הבית השמור תוקן: ${saved.repairs.join('; ')}` : null,
   dismissNotice: () => set({ notice: null }),
