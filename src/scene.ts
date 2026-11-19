@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { House, Item, Pt } from './house';
 import { moveItem, placeItem } from './edit';
-import { openSides, slatSpans, wallRects } from './geometry';
+import { openSides, roomDots, slatSpans, wallRects } from './geometry';
 
 const ROOM_COLORS = {
   room: 0xd9c7a8,
@@ -40,6 +40,45 @@ function makeLabel(text: string, kind: string, scale: number): THREE.Sprite {
   const s = new THREE.Sprite(mat);
   s.scale.set(scale, scale / 4, 1);
   return tag(s, kind);
+}
+
+/** Eye height of an average adult man: ~1.77 m tall, eyes ~12 cm below the top of the head. */
+export const EYE_HEIGHT = 1.65;
+export const PITCH_LIMIT = THREE.MathUtils.degToRad(80);
+const WALK_MOVE_SECONDS = 0.5;
+
+export const clampPitch = (p: number) => Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, p));
+
+/** Put the camera at eye height at (x, z), facing `yaw` (0 = toward -z) and `pitch` (clamped). */
+export function applyWalkPose(camera: THREE.Camera, x: number, z: number, yaw: number, pitch: number): void {
+  camera.rotation.order = 'YXZ';
+  camera.position.set(x, EYE_HEIGHT, z);
+  camera.rotation.set(clampPitch(pitch), yaw, 0);
+}
+
+const IGNORED_KINDS = new Set(['room-label', 'item-label', 'proposal-label', 'glass']);
+
+/** The room id of the dot under `ray`, or null when a wall/item/etc. is in front of it. */
+export function pickDot(ray: THREE.Raycaster, built: THREE.Object3D, dots: THREE.Object3D): string | null {
+  built.updateMatrixWorld(true);
+  dots.updateMatrixWorld(true);
+  const hit = ray
+    .intersectObjects([built, dots], true)
+    .find((h) => !IGNORED_KINDS.has(String(h.object.userData['kind'])));
+  const id = hit?.object.userData['roomId'];
+  return hit?.object.userData['kind'] === 'walk-dot' && typeof id === 'string' ? id : null;
+}
+
+export function buildDots(house: House): THREE.Group {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: 0x2f7dd1 });
+  for (const d of roomDots(house.rooms)) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.04, 24), mat);
+    m.position.set(d.pos.x, 0.03, d.pos.z);
+    m.userData['roomId'] = d.roomId;
+    g.add(tag(m, 'walk-dot'));
+  }
+  return g;
 }
 
 const shapeOf = (poly: Pt[]) =>
@@ -187,12 +226,16 @@ export type SceneHandle = {
   dispose: () => void;
   setView: (v: 'orbit' | 'top') => void;
   setHouse: (house: House, selectedId: string | null, proposal?: Item | null) => void;
+  enterWalk: () => void;
+  exitWalk: () => void;
 };
 
 export type SceneCallbacks = {
   onSelect: (id: string | null) => void;
   /** A finished drag: the item's new (already snapped and clamped) position. */
   onMove: (id: string, pos: Pt) => void;
+  /** Walk mode turned on or off (button, Escape). */
+  onWalk?: (walking: boolean) => void;
 };
 
 /** Mount a renderer into `el`. Only furniture items can be picked and dragged. */
@@ -212,6 +255,7 @@ export function mountScene(
   let selected: string | null = null;
   let ghost: Item | null = null;
   let built: THREE.Group | null = null;
+  let dots = new THREE.Group();
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   el.appendChild(renderer.domElement);
@@ -228,13 +272,23 @@ export function mountScene(
     }
     built = buildHouse(h, selected, ghost);
     scene.add(built);
+    scene.remove(dots);
+    dots.traverse((o) => {
+      if (o instanceof THREE.Mesh) o.geometry.dispose();
+    });
+    dots = buildDots(h);
+    dots.visible = walk !== null;
+    scene.add(dots);
     render();
   };
+  type Walk = { x: number; z: number; yaw: number; pitch: number };
+  let walk: Walk | null = null;
   rebuild(house);
 
   const controls = new OrbitControls(camera, renderer.domElement);
   const target = new THREE.Vector3(5, 0, 3.5);
   const setView = (v: 'orbit' | 'top') => {
+    if (walk) return;
     controls.target.copy(target);
     if (v === 'top') camera.position.set(target.x, 18, target.z + 0.001);
     else camera.position.set(5, 12, 16);
@@ -243,6 +297,89 @@ export function mountScene(
   };
   setView('orbit');
   controls.addEventListener('change', render);
+
+  // --- walk mode: own yaw/pitch look (exact eye height), dots to move between ---
+  let saved: { pos: THREE.Vector3; quat: THREE.Quaternion; target: THREE.Vector3 } | null = null;
+  let anim = 0;
+  const setWalkDot = (on: boolean) => {
+    dots.visible = on;
+  };
+  const poseWalk = () => {
+    if (walk) applyWalkPose(camera, walk.x, walk.z, walk.yaw, walk.pitch);
+    render();
+  };
+  const enterWalk = () => {
+    if (walk) return;
+    const room = house.rooms.find((r) => /entrance|כניסה/i.test(`${r.id} ${r.name}`)) ?? house.rooms[0];
+    const start = room ? roomDots([room])[0]?.pos : undefined;
+    if (!start) return;
+    saved = { pos: camera.position.clone(), quat: camera.quaternion.clone(), target: controls.target.clone() };
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    walk = { x: start.x, z: start.z, yaw: Math.atan2(-dir.x, -dir.z), pitch: 0 };
+    drag = null;
+    controls.enabled = false;
+    setWalkDot(true);
+    poseWalk();
+    cb.onWalk?.(true);
+  };
+  const exitWalk = () => {
+    if (!walk || !saved) return;
+    cancelAnimationFrame(anim);
+    walk = null;
+    camera.rotation.order = 'XYZ';
+    camera.position.copy(saved.pos);
+    camera.quaternion.copy(saved.quat);
+    controls.target.copy(saved.target);
+    controls.enabled = true;
+    controls.update();
+    saved = null;
+    setWalkDot(false);
+    render();
+    cb.onWalk?.(false);
+  };
+  const walkTo = (roomId: string) => {
+    const w = walk;
+    const dot = roomDots(house.rooms).find((d) => d.roomId === roomId);
+    if (!w || !dot) return;
+    cancelAnimationFrame(anim);
+    const from = { x: w.x, z: w.z };
+    const t0 = performance.now();
+    const step = (now: number) => {
+      if (walk !== w) return;
+      const t = Math.min((now - t0) / (WALK_MOVE_SECONDS * 1000), 1);
+      const k = t * t * (3 - 2 * t);
+      w.x = from.x + (dot.pos.x - from.x) * k;
+      w.z = from.z + (dot.pos.z - from.z) * k;
+      poseWalk();
+      if (t < 1) anim = requestAnimationFrame(step);
+    };
+    anim = requestAnimationFrame(step);
+  };
+  let look: { x: number; y: number; moved: number } | null = null;
+  const walkDown = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    look = { x: e.clientX, y: e.clientY, moved: 0 };
+    renderer.domElement.setPointerCapture(e.pointerId);
+  };
+  const walkMove = (e: PointerEvent) => {
+    if (!look || !walk) return;
+    const dx = e.clientX - look.x;
+    const dy = e.clientY - look.y;
+    look.x = e.clientX;
+    look.y = e.clientY;
+    look.moved += Math.abs(dx) + Math.abs(dy);
+    walk.yaw += dx * 0.004;
+    walk.pitch = clampPitch(walk.pitch + dy * 0.004);
+    poseWalk();
+  };
+  const walkUp = (e: PointerEvent) => {
+    const l = look;
+    look = null;
+    if (!l || !built || l.moved > 5) return;
+    aim(e);
+    const id = pickDot(ray, built, dots);
+    if (id) walkTo(id);
+  };
 
   // --- dragging items ---
   const ray = new THREE.Raycaster();
@@ -257,6 +394,7 @@ export function mountScene(
   let drag: Drag | null = null;
 
   const onDown = (e: PointerEvent) => {
+    if (walk) return walkDown(e);
     if (e.button !== 0 || !built) return;
     aim(e);
     const hit = ray.intersectObject(built, true).find((h) => h.object.userData['kind'] !== 'room-label');
@@ -275,6 +413,7 @@ export function mountScene(
     cb.onSelect(item.id);
   };
   const onMoveEvt = (e: PointerEvent) => {
+    if (walk) return walkMove(e);
     if (!drag) return;
     aim(e);
     const p = new THREE.Vector3();
@@ -291,13 +430,15 @@ export function mountScene(
     controls.enabled = true;
     drag = null;
   };
-  const onUp = () => {
+  const onUp = (e: PointerEvent) => {
+    if (walk) return walkUp(e);
     const d = drag;
     if (!d) return;
     endDrag();
     if (d.moved) cb.onMove(d.id, d.pos); // parent commits and calls setHouse
   };
   const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && walk) return exitWalk();
     if (e.key !== 'Escape' || !drag) return;
     endDrag();
     rebuild(house); // back to the pre-drag house; nothing was committed
@@ -321,15 +462,18 @@ export function mountScene(
   resize();
   return {
     setView,
+    enterWalk,
+    exitWalk,
     setHouse: (h, sel, proposal = null) => {
       house = h;
       selected = sel;
       ghost = proposal;
       drag = null;
-      controls.enabled = true;
+      controls.enabled = walk === null;
       rebuild(h);
     },
     dispose: () => {
+      cancelAnimationFrame(anim);
       ro.disconnect();
       dom.removeEventListener('pointerdown', onDown);
       dom.removeEventListener('pointermove', onMoveEvt);
