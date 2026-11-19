@@ -31,7 +31,13 @@ export const sampleHouse: House = {
     { id: 'bath', name: 'מקלחת', polygon: rect(6, 3.5, 10, 6), kind: 'wet' },
     { id: 'balcony', name: 'מרפסת', polygon: rect(0, 6, 6, 8), kind: 'balcony' },
   ],
-  roofs: [],
-  kitchen: null,
-  items: [],
+  roofs: [
+    { id: 'pergola', polygon: rect(0, 6, 3, 8), height: 2.6, kind: 'pergola' },
+    { id: 'slab', polygon: rect(3, 6, 6, 8), height: 2.6, kind: 'solid' },
+  ],
+  kitchen: { polygon: rect(0.2, 0.2, 3.2, 1.0), counterHeight: 0.9, hasIsland: true },
+  items: [
+    { id: 'sofa', name: 'ספה', size: { w: 2, d: 0.9, h: 0.8 }, pos: { x: 3, z: 4.5 }, rotation: 0, color: '#7a8fa6' },
+    { id: 'bed', name: 'מיטה', size: { w: 1.6, d: 2, h: 0.5 }, pos: { x: 8, z: 1.5 }, rotation: 90, color: '#c9a98b' },
+  ],
 };
