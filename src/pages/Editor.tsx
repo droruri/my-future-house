@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { mountScene, type SceneHandle } from '../scene';
 import { moveItem } from '../edit';
 import { useStore } from '../store';
@@ -8,6 +8,7 @@ import { SentenceBox } from './SentenceBox';
 
 export function Editor() {
   const ref = useRef<HTMLDivElement>(null);
+  const [walking, setWalking] = useState(false);
   const handle = useRef<SceneHandle | null>(null);
   const house = useStore((s) => s.house);
   const selectedId = useStore((s) => s.selectedId);
@@ -24,6 +25,7 @@ export function Editor() {
     const st = useStore.getState();
     const h = mountScene(el, st.house, {
       onSelect: (id) => useStore.getState().select(id),
+      onWalk: setWalking,
       onMove: (id, pos) => {
         const s = useStore.getState();
         s.commit(moveItem(s.house, id, pos));
@@ -80,6 +82,11 @@ export function Editor() {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 8 }}>
         <h1 style={{ margin: 0, fontSize: 20 }}>הבית העתידי שלי</h1>
+        {walking ? (
+          <button onClick={() => handle.current?.exitWalk()}>יציאה</button>
+        ) : (
+          <button onClick={() => handle.current?.enterWalk()}>כניסה לדירה</button>
+        )}
         <button onClick={() => handle.current?.setView('top')}>מבט מלמעלה</button>
         <button onClick={() => handle.current?.setView('orbit')}>מבט תלת־ממדי</button>
       </div>

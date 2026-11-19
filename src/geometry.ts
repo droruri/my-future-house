@@ -84,3 +84,58 @@ export function slatSpans(polygon: Pt[], spacing: number): { x: number; z0: numb
   }
   return out;
 }
+
+const inPoly = (poly: Pt[], x: number, z: number): boolean => {
+  let inside = false;
+  for (let i = 0; i + 1 < poly.length; i++) {
+    const p = poly[i];
+    const q = poly[i + 1];
+    if (!p || !q) continue;
+    if (p.z > z !== q.z > z && x < p.x + ((z - p.z) / (q.z - p.z)) * (q.x - p.x)) inside = !inside;
+  }
+  return inside;
+};
+
+const edgeDist = (poly: Pt[], x: number, z: number): number => {
+  let best = Infinity;
+  for (let i = 0; i + 1 < poly.length; i++) {
+    const p = poly[i];
+    const q = poly[i + 1];
+    if (!p || !q) continue;
+    const dx = q.x - p.x;
+    const dz = q.z - p.z;
+    const l2 = dx * dx + dz * dz;
+    const t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((x - p.x) * dx + (z - p.z) * dz) / l2));
+    best = Math.min(best, Math.hypot(x - (p.x + t * dx), z - (p.z + t * dz)));
+  }
+  return best;
+};
+
+/** A point inside the polygon, as far from its edges as a 5 cm grid search finds (works for L shapes). */
+export function pointInside(polygon: Pt[]): Pt | null {
+  const xs = polygon.map((p) => p.x);
+  const zs = polygon.map((p) => p.z);
+  if (xs.length === 0) return null;
+  const [x0, x1, z0, z1] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
+  const step = Math.max(0.05, Math.max(x1 - x0, z1 - z0) / 200);
+  let best: Pt | null = null;
+  let bestD = -1;
+  for (let x = x0 + step / 2; x < x1; x += step)
+    for (let z = z0 + step / 2; z < z1; z += step) {
+      if (!inPoly(polygon, x, z)) continue;
+      const d = edgeDist(polygon, x, z);
+      if (d > bestD) {
+        bestD = d;
+        best = { x, z };
+      }
+    }
+  return best;
+}
+
+/** One standing point per room (balconies included), in house order. */
+export function roomDots(rooms: Room[]): { roomId: string; pos: Pt }[] {
+  return rooms.flatMap((r) => {
+    const pos = pointInside(r.polygon);
+    return pos ? [{ roomId: r.id, pos }] : [];
+  });
+}
