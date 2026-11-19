@@ -44,16 +44,16 @@ export function AgentPanel() {
   };
   const num = (k: 'w' | 'd' | 'h', label: string) => (
     <div className="relative">
-    <input
-      aria-label={label}
-      placeholder={label}
-      type="number"
-      min={1}
-      value={cm[k] ?? ''}
-      onChange={(e) => setCm({ ...cm, [k]: e.target.value === '' ? undefined : Number(e.target.value) })}
-      className="field min-w-0 pe-9"
-    />
-    <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-2 flex items-center text-xs text-muted-fg">ס״מ</span>
+      <input
+        aria-label={label}
+        placeholder={label}
+        type="number"
+        min={1}
+        value={cm[k] ?? ''}
+        onChange={(e) => setCm({ ...cm, [k]: e.target.value === '' ? undefined : Number(e.target.value) })}
+        className="field min-w-0 pe-9"
+      />
+      <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-2 flex items-center text-xs text-muted-fg">ס״מ</span>
     </div>
   );
 

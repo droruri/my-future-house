@@ -83,8 +83,8 @@ export function Editor() {
       <header className="flex flex-wrap items-center gap-3 px-4 py-3">
         <h1 className="m-0 me-auto text-xl font-bold">הבית העתידי שלי</h1>
         <div className="inline-flex gap-1 rounded-md bg-info-bg p-1">
-          <button className="btn btn-ghost min-h-8" onClick={() => handle.current?.setView('orbit')}>מבט תלת־ממדי</button>
-          <button className="btn btn-ghost min-h-8" onClick={() => handle.current?.setView('top')}>מבט מלמעלה</button>
+          <button className="btn btn-ghost" onClick={() => handle.current?.setView('orbit')}>מבט תלת־ממדי</button>
+          <button className="btn btn-ghost" onClick={() => handle.current?.setView('top')}>מבט מלמעלה</button>
         </div>
         {walking ? (
           <button className="btn btn-primary" onClick={() => handle.current?.exitWalk()}>יציאה</button>
@@ -96,7 +96,7 @@ export function Editor() {
         <div role="status" className="fixed start-4 bottom-4 z-10 flex items-center gap-2 rounded-md bg-warn-bg py-2 ps-4 pe-2 shadow-card">
           {notice}
           <button
-            className="btn btn-ghost size-8 min-h-0 p-0"
+            className="btn btn-ghost size-10 p-0"
             aria-label="סגירה"
             onClick={() => useStore.getState().dismissNotice()}
           >
