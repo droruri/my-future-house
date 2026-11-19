@@ -3,12 +3,14 @@ import { mountScene, type SceneHandle } from '../scene';
 import { moveItem } from '../edit';
 import { useStore } from '../store';
 import { serializeHouse } from '../persist';
+import { AgentPanel } from './AgentPanel';
 
 export function Editor() {
   const ref = useRef<HTMLDivElement>(null);
   const handle = useRef<SceneHandle | null>(null);
   const house = useStore((s) => s.house);
   const selectedId = useStore((s) => s.selectedId);
+  const proposal = useStore((s) => s.proposal);
   const notice = useStore((s) => s.notice);
   const canUndo = useStore((s) => s.past.length > 0);
   const canRedo = useStore((s) => s.future.length > 0);
@@ -25,7 +27,7 @@ export function Editor() {
       },
     });
     handle.current = h;
-    h.setHouse(st.house, st.selectedId);
+    h.setHouse(st.house, st.selectedId, st.proposal);
     return () => {
       h.dispose();
       handle.current = null;
@@ -33,8 +35,8 @@ export function Editor() {
   }, []);
 
   useEffect(() => {
-    handle.current?.setHouse(house, selectedId);
-  }, [house, selectedId]);
+    handle.current?.setHouse(house, selectedId, proposal);
+  }, [house, selectedId, proposal]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -85,7 +87,7 @@ export function Editor() {
       )}
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         <div ref={ref} style={{ flex: 1, minWidth: 0 }} />
-        <aside style={{ width: 160, padding: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <aside style={{ width: 220, padding: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button onClick={() => useStore.getState().undo()} disabled={!canUndo}>ביטול (Ctrl+Z)</button>
           <button onClick={() => useStore.getState().redo()} disabled={!canRedo}>שחזור (Ctrl+Shift+Z)</button>
           <button onClick={onReset}>איפוס</button>
@@ -96,6 +98,7 @@ export function Editor() {
           </label>
           <button onClick={() => useStore.getState().rotateSelected()} disabled={!selectedId}>סיבוב (R)</button>
           <button onClick={() => useStore.getState().deleteSelected()} disabled={!selectedId}>מחיקה (Del)</button>
+          <AgentPanel />
         </aside>
       </div>
     </div>

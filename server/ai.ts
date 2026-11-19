@@ -12,6 +12,8 @@ export type ExtractArgs<T> = {
   files?: AiFile[];
   /** Which configured model to use. */
   model?: 'docs' | 'agent';
+  /** Lets the scripted fake pick its answer. */
+  task?: 'house' | 'item';
 };
 /** The only place a model is called. Never throws. */
 export type Ai = { extract<T>(args: ExtractArgs<T>): Promise<ExtractResult<T>> };
@@ -52,10 +54,32 @@ function logCall(model: string, started: number, ok: boolean) {
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : 'unknown error');
 
+/** Scripted: reads "W×D[×H]" from the source (cm if > 10); no numbers means no dimensions. */
+function fakeItem(prompt: string) {
+  const m = /(\d+(?:\.\d+)?)\s*[×x*]\s*(\d+(?:\.\d+)?)(?:\s*[×x*]\s*(\d+(?:\.\d+)?))?/.exec(prompt);
+  const metres = (v: string | undefined) => (v === undefined ? null : Number(v) > 10 ? Number(v) / 100 : Number(v));
+  const price = /(\d+)\s*(?:₪|ש"ח)/.exec(prompt)?.[1];
+  const room = /Rooms: ([^,\n]+)/.exec(prompt)?.[1];
+  return {
+    name: 'ספה תלת מושבית',
+    width: metres(m?.[1]),
+    depth: metres(m?.[2]),
+    height: m ? (metres(m[3]) ?? 0.85) : null,
+    color: '#8899aa',
+    price: price ? Number(price) : null,
+    room: room && room !== '(none)' ? room : null,
+  };
+}
+
 function fakeAi(): Ai {
   return {
-    async extract<T>({ schema, files }: ExtractArgs<T>): Promise<ExtractResult<T>> {
+    async extract<T>({ schema, files, prompt, task }: ExtractArgs<T>): Promise<ExtractResult<T>> {
       const started = Date.now();
+      if (task === 'item') {
+        const r = schema.safeParse(fakeItem(prompt));
+        logCall('fake', started, r.success);
+        return r.success ? { ok: true, value: r.data } : { ok: false, error: 'fake output does not match schema' };
+      }
       // Scripted: a file whose name contains "unreadable" cannot be read.
       const bad = files?.find((f) => f.name.includes('unreadable'));
       if (bad) {
