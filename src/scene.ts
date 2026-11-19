@@ -245,7 +245,7 @@ export function mountScene(
   cb: SceneCallbacks,
 ): SceneHandle {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xeef2f5);
+  scene.background = new THREE.Color(0xf5f1ec);
   scene.add(new THREE.AmbientLight(0xffffff, 1.2));
   const sun = new THREE.DirectionalLight(0xffffff, 2);
   sun.position.set(8, 15, 5);
