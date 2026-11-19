@@ -55,6 +55,9 @@ describe('validateHouse', () => {
     h.items = [
       { id: 'i', name: 'x', size: { w: 0, d: 99, h: 1 }, pos: { x: 0, z: 0 }, rotation: 0, color: '#fff' },
     ];
-    expect(repaired(h).house.items[0]?.size).toEqual({ w: 0.05, d: 10, h: 1 });
+    const r = repaired(h);
+    expect(r.house.items[0]?.size).toEqual({ w: 0.05, d: 10, h: 1 });
+    expect(r.repairs).toContain('item i: width clamped');
+    expect(r.repairs).toContain('item i: depth clamped');
   });
 });

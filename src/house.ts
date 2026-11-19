@@ -124,25 +124,38 @@ export function validateHouse(input: unknown): ValidateResult {
     const polygon = fixPoly(`room ${r.id}`, r.polygon);
     return polygon ? [{ ...r, polygon }] : [];
   });
+  const clampRepair = (what: string, field: string, v: number, lo: number, hi: number) => {
+    const c = clamp(v, lo, hi);
+    if (c !== v) repairs.push(`${what}: ${field} clamped`);
+    return c;
+  };
   const roofs = h.roofs.flatMap((r) => {
     const polygon = fixPoly(`roof ${r.id}`, r.polygon);
-    return polygon ? [{ ...r, polygon, height: clamp(r.height, 0.5, 6) }] : [];
+    if (!polygon) return [];
+    return [{ ...r, polygon, height: clampRepair(`roof ${r.id}`, 'height', r.height, 0.5, 6) }];
   });
   let kitchen = h.kitchen;
   if (kitchen) {
     const polygon = fixPoly('kitchen', kitchen.polygon);
     kitchen = polygon
-      ? { ...kitchen, polygon, counterHeight: clamp(kitchen.counterHeight, 0.6, 1.2) }
+      ? {
+          ...kitchen,
+          polygon,
+          counterHeight: clampRepair('kitchen', 'counterHeight', kitchen.counterHeight, 0.6, 1.2),
+        }
       : null;
   }
-  const items = h.items.map((i) => ({
-    ...i,
-    size: {
-      w: clamp(i.size.w, 0.05, 10),
-      d: clamp(i.size.d, 0.05, 10),
-      h: clamp(i.size.h, 0.05, 4),
-    },
-  }));
+  const items = h.items.map((i) => {
+    const what = `item ${i.id}`;
+    return {
+      ...i,
+      size: {
+        w: clampRepair(what, 'width', i.size.w, 0.05, 10),
+        d: clampRepair(what, 'depth', i.size.d, 0.05, 10),
+        h: clampRepair(what, 'height', i.size.h, 0.05, 4),
+      },
+    };
+  });
 
   return { ok: true, house: { ...h, walls, openings, rooms, roofs, kitchen, items }, repairs };
 }
