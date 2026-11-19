@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { House, Pt } from './house';
+import { moveItem, placeItem } from './edit';
 import { openSides, slatSpans, wallRects } from './geometry';
 
 const ROOM_COLORS = {
@@ -62,7 +63,7 @@ const centroid = (poly: Pt[]): Pt => {
 };
 
 /** Build the 3D group for a house. */
-export function buildHouse(house: House): THREE.Group {
+export function buildHouse(house: House, selectedId: string | null = null): THREE.Group {
   const group = new THREE.Group();
   const wallMat = new THREE.MeshStandardMaterial({ color: 0xf2efe9 });
   const glassMat = new THREE.MeshStandardMaterial({ color: 0x9ccbe8, transparent: true, opacity: 0.35 });
@@ -150,8 +151,12 @@ export function buildHouse(house: House): THREE.Group {
   for (const it of house.items) {
     const box = new THREE.Mesh(
       new THREE.BoxGeometry(it.size.w, it.size.h, it.size.d),
-      new THREE.MeshStandardMaterial({ color: new THREE.Color(it.color) }),
+      new THREE.MeshStandardMaterial({
+        color: new THREE.Color(it.color),
+        emissive: new THREE.Color(it.id === selectedId ? 0x335577 : 0x000000),
+      }),
     );
+    box.userData['itemId'] = it.id;
     box.position.set(it.pos.x, it.size.h / 2, it.pos.z);
     box.rotation.y = -THREE.MathUtils.degToRad(it.rotation);
     group.add(tag(box, 'item'));
@@ -162,21 +167,54 @@ export function buildHouse(house: House): THREE.Group {
   return group;
 }
 
-export type SceneHandle = { dispose: () => void; setView: (v: 'orbit' | 'top') => void };
+export type SceneHandle = {
+  dispose: () => void;
+  setView: (v: 'orbit' | 'top') => void;
+  setHouse: (house: House, selectedId: string | null) => void;
+};
 
-/** Mount a renderer into `el`. */
-export function mountScene(el: HTMLElement, house: House): SceneHandle {
+export type SceneCallbacks = {
+  onSelect: (id: string | null) => void;
+  /** A finished drag: the item's new (already snapped and clamped) position. */
+  onMove: (id: string, pos: Pt) => void;
+};
+
+/** Mount a renderer into `el`. Only furniture items can be picked and dragged. */
+export function mountScene(
+  el: HTMLElement,
+  initial: House,
+  cb: SceneCallbacks,
+): SceneHandle {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xeef2f5);
   scene.add(new THREE.AmbientLight(0xffffff, 1.2));
   const sun = new THREE.DirectionalLight(0xffffff, 2);
   sun.position.set(8, 15, 5);
   scene.add(sun);
-  scene.add(buildHouse(house));
 
+  let house = initial;
+  let selected: string | null = null;
+  let built: THREE.Group | null = null;
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   el.appendChild(renderer.domElement);
+  const render = () => renderer.render(scene, camera);
+  const rebuild = (h: House) => {
+    if (built) {
+      scene.remove(built);
+      built.traverse((o) => {
+        if (o instanceof THREE.Mesh || o instanceof THREE.Sprite) {
+          if (o.material instanceof THREE.Material) o.material.dispose();
+          if (o instanceof THREE.Mesh) o.geometry.dispose();
+        }
+      });
+    }
+    built = buildHouse(h, selected);
+    scene.add(built);
+    render();
+  };
+  rebuild(house);
+
   const controls = new OrbitControls(camera, renderer.domElement);
   const target = new THREE.Vector3(5, 0, 3.5);
   const setView = (v: 'orbit' | 'top') => {
@@ -187,8 +225,72 @@ export function mountScene(el: HTMLElement, house: House): SceneHandle {
     controls.update();
   };
   setView('orbit');
-  const render = () => renderer.render(scene, camera);
   controls.addEventListener('change', render);
+
+  // --- dragging items ---
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  const floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const aim = (e: PointerEvent) => {
+    const r = renderer.domElement.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+  };
+  type Drag = { id: string; grab: Pt; pos: Pt; moved: boolean };
+  let drag: Drag | null = null;
+
+  const onDown = (e: PointerEvent) => {
+    if (e.button !== 0 || !built) return;
+    aim(e);
+    const hit = ray.intersectObject(built, true).find((h) => h.object.userData['kind'] !== 'room-label');
+    const id = hit?.object.userData['itemId'];
+    const item = typeof id === 'string' ? house.items.find((i) => i.id === id) : undefined;
+    if (!item) {
+      // Walls, openings, kitchen, balcony: do nothing. Only empty space clears the selection.
+      if (!hit) cb.onSelect(null);
+      return;
+    }
+    const p = new THREE.Vector3();
+    if (!ray.ray.intersectPlane(floor, p)) return;
+    drag = { id: item.id, grab: { x: p.x - item.pos.x, z: p.z - item.pos.z }, pos: item.pos, moved: false };
+    controls.enabled = false;
+    renderer.domElement.setPointerCapture(e.pointerId);
+    cb.onSelect(item.id);
+  };
+  const onMoveEvt = (e: PointerEvent) => {
+    if (!drag) return;
+    aim(e);
+    const p = new THREE.Vector3();
+    if (!ray.ray.intersectPlane(floor, p)) return;
+    const item = house.items.find((i) => i.id === drag?.id);
+    if (!item) return;
+    const pos = placeItem(house, item, { x: p.x - drag.grab.x, z: p.z - drag.grab.z });
+    if (pos.x === drag.pos.x && pos.z === drag.pos.z) return;
+    drag.pos = pos;
+    drag.moved = true;
+    rebuild(moveItem(house, drag.id, pos));
+  };
+  const endDrag = () => {
+    controls.enabled = true;
+    drag = null;
+  };
+  const onUp = () => {
+    const d = drag;
+    if (!d) return;
+    endDrag();
+    if (d.moved) cb.onMove(d.id, d.pos); // parent commits and calls setHouse
+  };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape' || !drag) return;
+    endDrag();
+    rebuild(house); // back to the pre-drag house; nothing was committed
+  };
+  const dom = renderer.domElement;
+  dom.addEventListener('pointerdown', onDown);
+  dom.addEventListener('pointermove', onMoveEvt);
+  dom.addEventListener('pointerup', onUp);
+  window.addEventListener('keydown', onKey);
+
   const resize = () => {
     const w = el.clientWidth;
     const h = el.clientHeight;
@@ -202,8 +304,19 @@ export function mountScene(el: HTMLElement, house: House): SceneHandle {
   resize();
   return {
     setView,
+    setHouse: (h, sel) => {
+      house = h;
+      selected = sel;
+      drag = null;
+      controls.enabled = true;
+      rebuild(h);
+    },
     dispose: () => {
       ro.disconnect();
+      dom.removeEventListener('pointerdown', onDown);
+      dom.removeEventListener('pointermove', onMoveEvt);
+      dom.removeEventListener('pointerup', onUp);
+      window.removeEventListener('keydown', onKey);
       controls.dispose();
       renderer.dispose();
       renderer.domElement.remove();

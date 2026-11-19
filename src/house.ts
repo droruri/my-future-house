@@ -62,6 +62,7 @@ export const HouseSchema = z.object({
 export type Pt = z.infer<typeof PtSchema>;
 export type Wall = z.infer<typeof WallSchema>;
 export type Opening = z.infer<typeof OpeningSchema>;
+export type Item = z.infer<typeof ItemSchema>;
 export type Room = z.infer<typeof RoomSchema>;
 export type House = z.infer<typeof HouseSchema>;
 
