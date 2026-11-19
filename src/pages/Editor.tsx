@@ -4,6 +4,7 @@ import { moveItem } from '../edit';
 import { useStore } from '../store';
 import { serializeHouse } from '../persist';
 import { AgentPanel } from './AgentPanel';
+import { SentenceBox } from './SentenceBox';
 
 export function Editor() {
   const ref = useRef<HTMLDivElement>(null);
@@ -11,6 +12,8 @@ export function Editor() {
   const house = useStore((s) => s.house);
   const selectedId = useStore((s) => s.selectedId);
   const proposal = useStore((s) => s.proposal);
+  const renovation = useStore((s) => s.renovation);
+  const shown = renovation?.house ?? house;
   const notice = useStore((s) => s.notice);
   const canUndo = useStore((s) => s.past.length > 0);
   const canRedo = useStore((s) => s.future.length > 0);
@@ -27,7 +30,7 @@ export function Editor() {
       },
     });
     handle.current = h;
-    h.setHouse(st.house, st.selectedId, st.proposal);
+    h.setHouse(st.renovation?.house ?? st.house, st.selectedId, st.proposal);
     return () => {
       h.dispose();
       handle.current = null;
@@ -35,8 +38,8 @@ export function Editor() {
   }, []);
 
   useEffect(() => {
-    handle.current?.setHouse(house, selectedId, proposal);
-  }, [house, selectedId, proposal]);
+    handle.current?.setHouse(shown, selectedId, proposal);
+  }, [shown, selectedId, proposal]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -86,7 +89,14 @@ export function Editor() {
         </div>
       )}
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-        <div ref={ref} style={{ flex: 1, minWidth: 0 }} />
+        <div
+          key={renovation ? 'preview' : 'house'}
+          style={{ flex: 1, minWidth: 0, animation: renovation ? 'fadein 0.6s ease-out' : undefined }}
+          data-preview={renovation ? 'true' : undefined}
+        >
+          <style>{'@keyframes fadein{from{opacity:.3}to{opacity:1}}'}</style>
+          <div ref={ref} style={{ width: '100%', height: '100%' }} />
+        </div>
         <aside style={{ width: 220, padding: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button onClick={() => useStore.getState().undo()} disabled={!canUndo}>ביטול (Ctrl+Z)</button>
           <button onClick={() => useStore.getState().redo()} disabled={!canRedo}>שחזור (Ctrl+Shift+Z)</button>
@@ -98,6 +108,12 @@ export function Editor() {
           </label>
           <button onClick={() => useStore.getState().rotateSelected()} disabled={!selectedId}>סיבוב (R)</button>
           <button onClick={() => useStore.getState().deleteSelected()} disabled={!selectedId}>מחיקה (Del)</button>
+          <SentenceBox
+            house={house}
+            preview={renovation}
+            onPreview={(p) => useStore.getState().previewRenovation(p)}
+            onAccept={() => useStore.getState().acceptRenovation()}
+          />
           <AgentPanel />
         </aside>
       </div>

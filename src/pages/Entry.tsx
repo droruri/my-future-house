@@ -3,6 +3,7 @@ import { mountScene } from '../scene';
 import { Plan2D } from '../plan2d';
 import { parseDocuments, type ParseOutcome } from '../api';
 import { useStore } from '../store';
+import { SentenceBox, type Preview } from './SentenceBox';
 import type { House } from '../house';
 
 const accepted = (f: File) => f.type === 'application/pdf' || f.type.startsWith('image/');
@@ -25,6 +26,8 @@ export function Entry() {
   const [files, setFiles] = useState<File[]>([]);
   const [phase, setPhase] = useState<Phase>({ t: 'pick' });
   const [rejected, setRejected] = useState<string[]>([]);
+  const [fixed, setFixed] = useState<House | null>(null);
+  const [preview, setPreview] = useState<Preview | null>(null);
 
   const add = (list: FileList | null) => {
     if (!list) return;
@@ -35,12 +38,16 @@ export function Entry() {
 
   const build = async () => {
     setPhase({ t: 'busy' });
+    setFixed(null);
+    setPreview(null);
     const r = await parseDocuments(files);
     setPhase(r.ok ? { t: 'review', r } : { t: 'error', error: r.error, skipped: r.skipped });
   };
 
   if (phase.t === 'review') {
-    const { house, repairs, skipped } = phase.r;
+    const { repairs, skipped } = phase.r;
+    const house = fixed ?? phase.r.house;
+    const shown = preview?.house ?? house;
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <h1 style={{ margin: 8, fontSize: 20 }}>סקירת הבית</h1>
@@ -56,8 +63,18 @@ export function Entry() {
           </div>
         )}
         <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-          <div style={{ flex: 1, minWidth: 0 }}><Plan2D house={house} /></div>
-          <div style={{ flex: 1, minWidth: 0 }}><Preview3D house={house} /></div>
+          <div style={{ flex: 1, minWidth: 0 }}><Plan2D house={shown} /></div>
+          <div style={{ flex: 1, minWidth: 0 }}><Preview3D house={shown} /></div>
+        </div>
+        <div style={{ margin: '0 8px' }}>
+          <SentenceBox
+            house={house}
+            preview={preview}
+            onPreview={setPreview}
+            onAccept={(p) => { setFixed(p.house); setPreview(null); }}
+            title="תיקון במשפט"
+            placeholder="למשל: המרפסת עמוקה 2 מטר ולא 1.6"
+          />
         </div>
         <div style={{ margin: 8, display: 'flex', gap: 8 }}>
           <button onClick={() => useStore.getState().confirmHouse(house)}>אישור</button>

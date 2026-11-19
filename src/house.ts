@@ -160,3 +160,101 @@ export function validateHouse(input: unknown): ValidateResult {
 
   return { ok: true, house: { ...h, walls, openings, rooms, roofs, kitchen, items }, repairs };
 }
+
+// ---------- Edits: the only way the renovation agent changes a house ----------
+
+export const EditSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('addWall'), wall: WallSchema }),
+  z.object({ type: z.literal('removeWall'), id: z.string() }),
+  z.object({ type: z.literal('moveWall'), id: z.string(), a: PtSchema, b: PtSchema }),
+  z.object({ type: z.literal('addOpening'), opening: OpeningSchema }),
+  z.object({ type: z.literal('removeOpening'), id: z.string() }),
+  z.object({
+    type: z.literal('setRoom'),
+    id: z.string(),
+    name: z.string().nullable(),
+    polygon: z.array(PtSchema).nullable(),
+    kind: RoomSchema.shape.kind.nullable(),
+  }),
+  z.object({ type: z.literal('addRoof'), roof: RoofSchema }),
+  z.object({ type: z.literal('removeRoof'), id: z.string() }),
+  z.object({ type: z.literal('setKitchen'), kitchen: KitchenSchema.nullable() }),
+  z.object({ type: z.literal('removeItem'), id: z.string() }),
+]);
+export type Edit = z.infer<typeof EditSchema>;
+
+export type ApplyResult =
+  | { ok: true; house: House; changes: string[]; repairs: string[] }
+  | { ok: false; error: string };
+
+/** Applies every edit or none: a missing target refuses the whole list. Result goes through validateHouse. */
+export function applyEdits(house: House, edits: Edit[]): ApplyResult {
+  let h = house;
+  const changes: string[] = [];
+  for (const e of edits) {
+    const missing = (what: string, id: string): ApplyResult => ({ ok: false, error: `${what} "${id}" לא קיים בבית — לא בוצע שום שינוי` });
+    const dup = (what: string, id: string): ApplyResult => ({ ok: false, error: `${what} "${id}" כבר קיים — לא בוצע שום שינוי` });
+    switch (e.type) {
+      case 'addWall':
+        if (h.walls.some((w) => w.id === e.wall.id)) return dup('קיר', e.wall.id);
+        h = { ...h, walls: [...h.walls, e.wall] };
+        changes.push(`הוספת קיר ${e.wall.id}`);
+        break;
+      case 'removeWall': {
+        if (!h.walls.some((w) => w.id === e.id)) return missing('קיר', e.id);
+        const gone = h.openings.filter((o) => o.wallId === e.id).length;
+        h = { ...h, walls: h.walls.filter((w) => w.id !== e.id), openings: h.openings.filter((o) => o.wallId !== e.id) };
+        changes.push(`הסרת קיר ${e.id}${gone > 0 ? ` (וגם ${gone} פתחים בו)` : ''}`);
+        break;
+      }
+      case 'moveWall':
+        if (!h.walls.some((w) => w.id === e.id)) return missing('קיר', e.id);
+        h = { ...h, walls: h.walls.map((w) => (w.id === e.id ? { ...w, a: e.a, b: e.b } : w)) };
+        changes.push(`הזזת קיר ${e.id}`);
+        break;
+      case 'addOpening':
+        if (!h.walls.some((w) => w.id === e.opening.wallId)) return missing('קיר', e.opening.wallId);
+        if (h.openings.some((o) => o.id === e.opening.id)) return dup('פתח', e.opening.id);
+        h = { ...h, openings: [...h.openings, e.opening] };
+        changes.push(`הוספת פתח ${e.opening.id} בקיר ${e.opening.wallId}`);
+        break;
+      case 'removeOpening':
+        if (!h.openings.some((o) => o.id === e.id)) return missing('פתח', e.id);
+        h = { ...h, openings: h.openings.filter((o) => o.id !== e.id) };
+        changes.push(`הסרת פתח ${e.id}`);
+        break;
+      case 'setRoom': {
+        const room = h.rooms.find((r) => r.id === e.id);
+        if (!room) return missing('חדר', e.id);
+        const next = { ...room, ...(e.name !== null ? { name: e.name } : {}), ...(e.polygon !== null ? { polygon: e.polygon } : {}), ...(e.kind !== null ? { kind: e.kind } : {}) };
+        h = { ...h, rooms: h.rooms.map((r) => (r.id === e.id ? next : r)) };
+        changes.push(`עדכון חדר ${room.name}`);
+        break;
+      }
+      case 'addRoof':
+        if (h.roofs.some((r) => r.id === e.roof.id)) return dup('גג', e.roof.id);
+        h = { ...h, roofs: [...h.roofs, e.roof] };
+        changes.push(`הוספת ${e.roof.kind === 'pergola' ? 'פרגולה' : 'גג'} ${e.roof.id}`);
+        break;
+      case 'removeRoof':
+        if (!h.roofs.some((r) => r.id === e.id)) return missing('גג', e.id);
+        h = { ...h, roofs: h.roofs.filter((r) => r.id !== e.id) };
+        changes.push(`הסרת גג ${e.id}`);
+        break;
+      case 'setKitchen':
+        h = { ...h, kitchen: e.kitchen };
+        changes.push(e.kitchen ? (h.kitchen?.hasIsland ? 'עדכון מטבח עם אי' : 'עדכון מטבח') : 'הסרת המטבח');
+        break;
+      case 'removeItem': {
+        const item = h.items.find((i) => i.id === e.id);
+        if (!item) return missing('פריט', e.id);
+        h = { ...h, items: h.items.filter((i) => i.id !== e.id) };
+        changes.push(`הסרת ${item.name}`);
+        break;
+      }
+    }
+  }
+  const v = validateHouse(h);
+  if (!v.ok) return { ok: false, error: `התוצאה אינה בית תקין: ${v.error}` };
+  return { ok: true, house: v.house, changes, repairs: v.repairs };
+}

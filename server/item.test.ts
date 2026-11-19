@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { sampleHouse } from '../src/sample';
 import { createApp } from './index';
 import { createAi, parseEnv } from './ai';
 import { createFetchPage, isPrivateIp } from './safeFetch';
@@ -77,4 +78,23 @@ describe('safe fetch', () => {
     const r = await f('https://ok.example/');
     expect(r.ok).toBe(false);
   }, 8000);
+});
+
+describe('/api/edit', () => {
+  const edit = (request: string) =>
+    createApp(ai).request('/api/edit', { method: 'POST', body: JSON.stringify({ house: sampleHouse, request }), headers: { 'content-type': 'application/json' } });
+  it('returns edits for a sentence', async () => {
+    const res = await edit('תוריד את הקיר הפנימי');
+    const b = (await res.json()) as { ok: boolean; edits: { type: string }[] };
+    expect(res.status).toBe(200);
+    expect(b.edits.map((e) => e.type)).toEqual(['removeWall']);
+    const k = (await (await edit('add a kitchen island')).json()) as { edits: { type: string }[] };
+    expect(k.edits[0]?.type).toBe('setKitchen');
+    const p = (await (await edit('תוסיף פרגולה מעל חצי מהמרפסת')).json()) as { edits: { type: string }[] };
+    expect(p.edits[0]?.type).toBe('addRoof');
+  });
+  it('rejects a bad request', async () => {
+    const res = await createApp(ai).request('/api/edit', { method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } });
+    expect(res.status).toBe(400);
+  });
 });

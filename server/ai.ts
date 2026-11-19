@@ -13,7 +13,7 @@ export type ExtractArgs<T> = {
   /** Which configured model to use. */
   model?: 'docs' | 'agent';
   /** Lets the scripted fake pick its answer. */
-  task?: 'house' | 'item';
+  task?: 'house' | 'item' | 'edit';
 };
 /** The only place a model is called. Never throws. */
 export type Ai = { extract<T>(args: ExtractArgs<T>): Promise<ExtractResult<T>> };
@@ -71,12 +71,32 @@ function fakeItem(prompt: string) {
   };
 }
 
+/** Scripted: picks edits from keywords in the request, using ids from the house in the prompt. */
+function fakeEdits(prompt: string) {
+  const request = /Request: ([^\n]*)/.exec(prompt)?.[1] ?? '';
+  const edits: unknown[] = [];
+  if (/nope|missing|לא קיים/.test(request)) edits.push({ type: 'removeWall', id: 'no-such-wall' });
+  else if (/קיר|wall/i.test(request)) edits.push({ type: 'removeWall', id: 'i1' });
+  if (/מטבח|kitchen|island/i.test(request))
+    edits.push({ type: 'setKitchen', kitchen: { polygon: [{ x: 0.2, z: 0.2 }, { x: 3.2, z: 0.2 }, { x: 3.2, z: 1 }, { x: 0.2, z: 1 }, { x: 0.2, z: 0.2 }], counterHeight: 0.9, hasIsland: true } });
+  if (/פרגולה|pergola/i.test(request))
+    edits.push({ type: 'addRoof', roof: { id: 'pergola-new', polygon: [{ x: 3, z: 6 }, { x: 4.5, z: 6 }, { x: 4.5, z: 8 }, { x: 3, z: 8 }, { x: 3, z: 6 }], height: 2.6, kind: 'pergola' } });
+  if (/עמוקה|deep/i.test(request))
+    edits.push({ type: 'setRoom', id: 'balcony', name: null, kind: null, polygon: [{ x: 0, z: 6 }, { x: 6, z: 6 }, { x: 6, z: 8 }, { x: 0, z: 8 }, { x: 0, z: 6 }] });
+  return { edits };
+}
+
 function fakeAi(): Ai {
   return {
     async extract<T>({ schema, files, prompt, task }: ExtractArgs<T>): Promise<ExtractResult<T>> {
       const started = Date.now();
       if (task === 'item') {
         const r = schema.safeParse(fakeItem(prompt));
+        logCall('fake', started, r.success);
+        return r.success ? { ok: true, value: r.data } : { ok: false, error: 'fake output does not match schema' };
+      }
+      if (task === 'edit') {
+        const r = schema.safeParse(fakeEdits(prompt));
         logCall('fake', started, r.success);
         return r.success ? { ok: true, value: r.data } : { ok: false, error: 'fake output does not match schema' };
       }

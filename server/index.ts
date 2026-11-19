@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { createAi, parseEnv, type Ai } from './ai';
 import { parseDocs } from './parseDocs';
+import { EditRequest, findEdits } from './edit';
 import { findItem, ItemRequest } from './item';
 import { createFetchPage, type FetchPage } from './safeFetch';
 
@@ -33,6 +34,12 @@ export function createApp(ai: Ai, fetchPage: FetchPage = createFetchPage()) {
     if (!body.success) return c.json({ ok: false, error: 'בקשה לא תקינה', suggestPaste: false }, 400);
     const r = await findItem(ai, fetchPage, body.data);
     return c.json(r, r.ok ? 200 : r.suggestPaste ? 422 : 502);
+  });
+  app.post('/api/edit', async (c) => {
+    const body = EditRequest.safeParse(await c.req.json().catch(() => null));
+    if (!body.success) return c.json({ ok: false, error: 'בקשה לא תקינה' }, 400);
+    const r = await findEdits(ai, body.data);
+    return c.json(r, r.ok ? 200 : 502);
   });
   return app;
 }
