@@ -10,7 +10,7 @@
   #app { position: fixed; inset: 0; }
   #labels { position: fixed; inset: 0; pointer-events: none; direction: ltr; }
   #labels .lbl { left: 0; top: 0; direction: rtl; }
-  #labels.hidden, #labels.walking { display: none; }  /* labels aren't occluded by walls */
+  #labels.walking, #labels.hidden .lbl, #labels.hidden .elbl { display: none; }  /* labels aren't occluded by walls */
   .lbl { text-align: center; color: #1e293b; text-shadow: 0 0 3px #fff, 0 0 6px #fff; white-space: nowrap; line-height: 1.2; }
   .lbl b { display: block; font-size: 13px; }
   .lbl span { font-size: 11px; color: #475569; }
@@ -41,6 +41,11 @@
   #labels .elbl { left: 0; top: 0; }
   .elbl { font-size: 10px; line-height: 1.3; padding: 0 4px; border-radius: 6px; white-space: nowrap; background: rgba(255,255,255,0.85); color: #92400e; border: 1px solid #f59e0b; }
   .elbl.sw { color: #1e3a8a; border-color: #3b82f6; }
+  #labels .dimw { left: 0; top: 0; }
+  .dim { display: inline-block; font-size: 10px; line-height: 1.3; padding: 0 3px; border-radius: 4px; white-space: nowrap; background: rgba(255,255,255,0.9); color: #334155; border: 1px solid #94a3b8; }
+  .dim.v { rotate: -90deg; }
+  .dim.window { color: #1d4ed8; border-color: #60a5fa; }
+  .dim.door { color: #15803d; border-color: #4ade80; }
 </style>
 <script type="importmap">
 { "imports": {
@@ -66,6 +71,7 @@
     <button id="tFurniture" aria-pressed="true">ריהוט</button>
     <button id="tPlan" aria-pressed="false">שרטוט מקורי</button>
     <button id="tElec" class="wide" aria-pressed="true">חשמל: נורות · מפסקים · שקעים</button>
+    <button id="tDims" class="wide" aria-pressed="false">מידות קירות (ס"מ)</button>
   </div>
   <label for="cut">גובה חיתוך קירות</label>
   <input id="cut" dir="ltr" type="range" min="0.3" max="2.8" step="0.05" value="2.8" />
@@ -82,7 +88,7 @@
 
 <!-- Approved furniture moves: item id → offset (m) from where the code draws it. Written by the
      "שמירה" button; edit or reset to {} by hand if needed. -->
-<script type="application/json" id="layout">{"sofa":{"x":-0.03,"z":0.05},"jacuzzi":{"x":0.03,"z":0.04}}</script>
+<script type="application/json" id="layout">{"sofa":{"x":-9.34,"z":-3.53},"figure":{"x":-0.83,"z":3.04},"jacuzzi":{"x":0.03,"z":0.04}}</script>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -178,8 +184,29 @@ function box(x1, y1, x2, y2, h0, h1, material, parent = scene) {
 const walls = new THREE.Group();
 scene.add(walls);
 
+// Optional view: the length (cm, along the centre line) of every wall, door and window
+// segment, written on top of it. Stubs under 20 cm are left unlabelled.
+const dims = new THREE.Group();
+dims.visible = false;
+scene.add(dims);
+const DIM_PREFIX = { wall: '', door: 'פתח ', window: 'חלון ' };
+function dimLabel([x1, y1, x2, y2], kind) {
+  const isH = Math.abs(x2 - x1) > Math.abs(y2 - y1);
+  const cm = Math.round(Math.abs(isH ? x2 - x1 : y2 - y1) * CM_PER_PX);
+  if (cm < 20) return;
+  const el = document.createElement('div');            // CSS2DRenderer owns this one's transform,
+  el.className = 'dimw';                               // so the vertical turn goes on the inner tag
+  const tag = el.appendChild(document.createElement('span'));
+  tag.className = `dim ${kind} ${isH ? 'h' : 'v'}`;
+  tag.textContent = `${DIM_PREFIX[kind]}${cm}`;
+  const label = new CSS2DObject(el);
+  label.position.set(wx((x1 + x2) / 2), H, wz((y1 + y2) / 2));
+  dims.add(label);
+}
+
 function segment(rect, t, kind, o, material) {
   const [x1, y1, x2, y2] = rect;
+  dimLabel(rect, kind);
   const add = (h0, h1, m = material) => box(x1, y1, x2, y2, h0, h1, m, walls);
   if (kind === 'wall') add(0, H);
   else if (kind === 'door') add(o.head ?? 2.1, H);
@@ -218,16 +245,16 @@ v(283, 303, 557, T.ext);
 h(543, 40, 180, T.ext);
 h(543, 180, 270, T.ext, 'window', KITCHEN_WIN);
 h(543, 270, 283, T.ext);
-v(48, 535, 790, T.ext);
-v(48, 790, 850, T.ext, 'window', { sill: 1.4, head: 2.2 });
-v(48, 850, 900, T.ext);
+v(48, 535, 900, T.ext);
 // South edge of the open space: kitchen stub · corridor · core · entrance · shaft · hall · partition
 h(553, 279, 349, T.int);            // stub that ends the kitchen tall wall (343 cm)
 h(572, 430, 545, T.core, 'wall', {}, MAT.core);
 h(572, 545, 600, T.core, 'door', { head: 2.2 }, MAT.core);
 h(572, 600, 652, T.core, 'wall', {}, MAT.core);
 h(572, 728, 905, T.int);
-h(572, 905, 980, T.ext);
+h(572, 905, 913, T.ext);
+h(572, 913, 973, T.ext, 'window', LOW_WIN);   // master bedroom, NE corner: "88", "200+30 (+0.30)"
+h(572, 973, 980, T.ext);
 // Bedroom 3 ↔ corridor, bedroom 3 ↔ bathroom
 v(345, 553, 715, T.int);
 v(345, 715, 765, T.int, 'door');
@@ -238,35 +265,45 @@ v(278, 775, 830, T.int, 'door');
 v(278, 830, 893, T.int);
 // Corridor ↔ lobby
 v(430, 572, 893, T.core, 'wall', {}, MAT.core);
+// Bathroom south wall: window in the south-west corner, onto the hidden laundry (מסתור כביסה)
+h(893, 40, 56, T.ext);
+h(893, 56, 116, T.ext, 'window', { sill: 1.4, head: 2.2 });
+h(893, 116, 140, T.ext);
 // Mamad (reinforced safe room)
-h(893, 40, 140, T.ext);
 h(893, 140, 290, T.mamad, 'wall', {}, MAT.mamad);
 h(893, 290, 345, T.mamad, 'door', { head: 2.0 }, MAT.mamad);
-h(893, 345, 430, T.mamad, 'wall', {}, MAT.mamad);
+h(893, 345, 382, T.mamad, 'wall', {}, MAT.mamad);
+// South end of the corridor: 67 cm window, "200+30 (+0.30)"
+h(893, 382, 427, T.ext, 'window', LOW_WIN);
+h(893, 427, 430, T.ext);
 v(152, 893, 937, T.mamad, 'wall', {}, MAT.mamad);
 v(152, 937, 1022, T.mamad, 'window', { sill: 1.0, head: 2.0 }, MAT.mamad);
 v(152, 1022, 1160, T.mamad, 'wall', {}, MAT.mamad);
 h(1148, 140, 384, T.mamad, 'wall', {}, MAT.mamad);
 v(372, 893, 1160, T.mamad, 'wall', {}, MAT.mamad);
-// Parents' hall, en-suite, master bedroom
-v(652, 572, 800, T.int);
+// Parents' hall, en-suite, master bedroom. The en-suite wall follows the shower (130/80):
+// north and east of the shower, then a 45 cm step out to the bathroom's east wall. The box
+// east of the shower belongs to the bedroom. The en-suite reaches further south (to the
+// laundry balcony) than the bedroom's slider wall.
+v(652, 572, 818, T.int);
 v(735, 572, 585, T.int);
-v(735, 585, 640, T.int, 'door');
-h(645, 652, 794, T.int);
-v(790, 645, 700, T.int);
-v(790, 700, 748, T.int, 'door');
-v(790, 748, 800, T.int);
-h(800, 600, 735, T.ext);
-h(800, 735, 785, T.ext, 'window', { sill: 1.3, head: 2.3 });
-h(800, 785, 790, T.ext);
-h(797, 782, 805, T.ext);
-h(797, 805, 940, T.ext, 'window', SLIDER);
-h(797, 940, 983, T.ext);
-v(975, 572, 610, T.ext);
-v(975, 610, 740, T.ext, 'window', LOW_WIN);
-v(975, 740, 797, T.ext);
+v(735, 585, 641, T.int, 'door');
+h(641, 652, 753, T.int);
+v(749, 641, 698, T.int);
+h(698, 745, 784, T.int);
+v(780, 698, 703, T.int);
+v(780, 703, 751, T.int, 'door');
+v(780, 751, 790, T.int);
+v(784, 790, 826, T.ext);
+h(818, 600, 722, T.ext);
+h(818, 722, 769, T.ext, 'window', { sill: 1.3, head: 2.3 });   // "70 (100+1.30)"
+h(818, 769, 776, T.ext);
+h(792, 776, 805, T.ext);
+h(792, 805, 940, T.ext, 'window', SLIDER);
+h(792, 940, 983, T.ext);
+v(975, 572, 800, T.ext);
 // Building core: shaft next to the entrance, elevator
-box(600, 572, 652, 800, 0, H, MAT.core, walls);
+box(600, 572, 652, 810, 0, H, MAT.core, walls);
 box(440, 578, 530, 700, 0, H, MAT.core, walls);
 
 // ---------------------------------------------------------------------------
@@ -280,12 +317,12 @@ const rooms = [
   { name: 'מסדרון', poly: [[345, 572], [430, 572], [430, 893], [278, 893], [278, 765], [345, 765]], mat: MAT.tile, at: [388, 740] },
   { name: 'חדר רחצה', poly: rect(48, 765, 278, 893), mat: MAT.wet },
   { name: 'ממ"ד / חדר שינה 2', poly: rect(152, 893, 372, 1148), mat: MAT.wood },
-  { name: 'מבואה', poly: rect(652, 572, 735, 645), mat: MAT.tile, noArea: true },
-  { name: 'רחצה הורים', poly: rect(652, 645, 790, 800), mat: MAT.wet },
-  { name: 'חדר שינה הורים', poly: [[735, 572], [975, 572], [975, 797], [790, 797], [790, 645], [735, 645]], mat: MAT.wood, at: [880, 740] },
+  { name: 'מבואה', poly: rect(652, 572, 735, 641), mat: MAT.tile, noArea: true },
+  { name: 'רחצה הורים', poly: [[652, 641], [749, 641], [749, 698], [780, 698], [780, 818], [652, 818]], mat: MAT.wet, at: [705, 750] },
+  { name: 'חדר שינה הורים', poly: [[735, 572], [975, 572], [975, 792], [780, 792], [780, 698], [749, 698], [749, 641], [735, 641]], mat: MAT.wood, at: [880, 700] },
   { name: 'לובי קומה 7', poly: rect(430, 572, 600, 1060), mat: MAT.lobby, kind: 'common', at: [515, 820] },
   { name: 'מרפסת שמש', poly: [[40, 25], [982, 25], [982, 286], [1018, 286], [1018, 572], [910, 572], [910, 303], [283, 303], [283, 543], [40, 543]], mat: MAT.deck, kind: 'outside', at: [600, 200] },
-  { name: 'מרפסת + כביסה', poly: rect(600, 800, 985, 893), mat: MAT.deck, kind: 'outside', at: [830, 850] },
+  { name: 'מרפסת + כביסה', poly: [[600, 818], [784, 818], [784, 792], [985, 792], [985, 893], [600, 893]], mat: MAT.deck, kind: 'outside', at: [830, 850] },
 ];
 
 const polyArea = (p) => Math.abs(p.reduce((s, [x, y], i) => {
@@ -327,7 +364,7 @@ scene.add(rails);
 const railH = (y, x1, x2) => box(x1, y - 1, x2, y + 1, 0, RAIL, MAT.rail, rails);
 const railV = (x, y1, y2) => box(x - 1, y1, x + 1, y2, 0, RAIL, MAT.rail, rails);
 railH(32, 56, 978); railV(978, 32, 288); railH(288, 978, 1013); railV(1013, 288, 572);
-railH(893, 600, 985); railV(985, 797, 893);
+railH(893, 600, 985); railV(985, 800, 893);
 
 // ---------------------------------------------------------------------------
 // Furniture & fixtures (toggleable)
@@ -336,6 +373,14 @@ const furniture = new THREE.Group();
 scene.add(furniture);
 let parent = furniture;                         // where f / kMesh add meshes; item() swaps it
 const f = (x1, y1, x2, y2, h0, h1, m) => box(x1, y1, x2, y2, h0, h1, m, parent);
+// Any geometry centred on plan point (x, y) at height h (m).
+function fMesh(geo, m, x, y, h) {
+  const o = new THREE.Mesh(geo, m);
+  o.position.set(wx(x), h, wz(y));
+  o.castShadow = o.receiveShadow = true;
+  parent.add(o);
+  return o;
+}
 
 // A free-standing piece that can be dragged. Its meshes go into one group that sits at the
 // origin, so group.position is exactly the piece's offset from where the code draws it.
@@ -361,13 +406,7 @@ function k(e1, s1, e2, s2, h0, h1, m) {
   const [x1, y1] = kp(e1, s1), [x2, y2] = kp(e2, s2);
   return f(x1, y1, x2, y2, h0 / 100, h1 / 100, m);
 }
-function kMesh(geo, m, e, s, h) {
-  const [x, y] = kp(e, s);
-  const o = new THREE.Mesh(geo, m);
-  o.position.set(wx(x), h / 100, wz(y));
-  o.castShadow = o.receiveShadow = true;
-  parent.add(o);
-}
+const kMesh = (geo, m, e, s, h) => fMesh(geo, m, ...kp(e, s), h / 100);
 const kCyl = (e, s, r, h0, h1, m) => kMesh(new THREE.CylinderGeometry(r / 100, r / 100, (h1 - h0) / 100, 24), m, e, s, (h0 + h1) / 2);
 const kRing = (e, s, r0, r1, h, m) => kMesh(new THREE.RingGeometry(r0 / 100, r1 / 100, 40).rotateX(-Math.PI / 2), m, e, s, h);
 
@@ -489,6 +528,35 @@ for (const [e, s, r] of [[239, 150, 7], [239, 181, 9], [265, 150, 9], [265, 181,
 }
 // Rug 247×160 in the aisle
 item('rug', () => k(58.1, 79, 218.1, 326, 0, 1, MAT.rug));
+// Dining, east of the peninsula, centred under light point 1E. Hootam "Paris": round oak-veneer
+// top Ø130 (+50 butterfly leaf, shown closed) on an oak-tone aluminium X base; height isn't
+// published, 75 assumed. Four upholstered chairs on thin black legs as in the product photo
+// (sizes assumed). One item, so the table and its chairs drag together.
+item('dining', () => {
+  const oak = mat(0xcfae84), boucle = mat(0xe6e0d4, { roughness: 1 }), black = mat(0x1d1f21, { roughness: 0.5 });
+  const TE = (592 - KX) * CM_PER_PX, TS = (395 - KY) * CM_PER_PX;   // light 1E, in kitchen cm
+  const R = 65, TOP_H = 75;
+  kCyl(TE, TS, R, TOP_H - 3, TOP_H, oak);
+  kCyl(TE, TS, 4, 30, TOP_H - 3, oak);
+  for (let i = 0; i < 4; i++) {                     // X base: four splayed legs, between the chairs
+    const a = Math.PI / 4 + i * Math.PI / 2, de = Math.cos(a), ds = Math.sin(a);
+    const FOOT = 55, TOP = 3, H0 = 1.5, H1 = 40;
+    const len = Math.hypot(FOOT - TOP, H1 - H0) / 100;
+    const mid = (FOOT + TOP) / 2;
+    const leg = kMesh(new THREE.BoxGeometry(0.05, 0.03, len), oak, TE + de * mid, TS + ds * mid, (H0 + H1) / 2);
+    const [fx, fy] = kp(TE + de * FOOT, TS + ds * FOOT);
+    leg.lookAt(wx(fx), H0 / 100, wz(fy));           // the item group sits at the origin while building
+  }
+  const chair = (fe, fs) => {                       // (fe, fs): the way the chair faces, toward the table
+    const d = R - 12 + 26;                          // seat front tucked 12 cm under the top
+    const ce = TE - fe * d, cs = TS - fs * d;
+    const at = (a, b) => [ce + fe * a - fs * b, cs + fs * a + fe * b];   // a forward, b sideways
+    for (const [a, b] of [[-21, -21], [-21, 21], [21, -21], [21, 21]]) kCyl(...at(a, b), 1, 0, 44, black);
+    k(...at(-25, -25), ...at(26, 25), 44, 50, boucle);     // seat
+    k(...at(-27, -24), ...at(-21, 24), 50, 82, boucle);    // back
+  };
+  chair(0, 1); chair(0, -1); chair(1, 0); chair(-1, 0);
+});
 // Living room. Local cm from the inner NE corner: w = west of the east-wall face,
 // s = south of the north-façade face, heights in cm.
 const LX = 902, LY = 311;                       // inner NE living corner (plan px)
@@ -497,6 +565,28 @@ function l(w1, s1, w2, s2, h0, h1, m) {
   const [x1, y1] = lp(w1, s1), [x2, y2] = lp(w2, s2);
   return f(x1, y1, x2, y2, h0 / 100, h1 / 100, m);
 }
+const lCyl = (w, s, r, h0, h1, m) => fMesh(new THREE.CylinderGeometry(r / 100, r / 100, (h1 - h0) / 100, 32), m, ...lp(w, s), (h0 + h1) / 200);
+const TVX = 815, TV_WALL = 568;                 // TV centre line, face of the south wall (plan px)
+// Vittorio Divani "Eloise" corner sofa: 303 long, chaise 202, 94 deep, seat 45 high × 62 deep,
+// tall black metal legs, basic beige fabric. Back on the north glass, chaise down the east
+// wall (order "chaise right", standing in front of it). Back height, arm width and leg height
+// aren't published: 82 / 15 / 14 assumed.
+item('cornerSofa', () => {
+  const fabric = mat(0xd9d0c2, { roughness: 1 }), black = mat(0x1d1f21, { roughness: 0.5 });
+  const LEN = 303, DEEP = 94, CHAISE = 202, ARM = 15, LEG = 14, BASE_H = 35, SEAT = 45, BACK = 82;
+  for (const [w, s] of [[4, 4], [LEN / 2, 4], [LEN - 4, 4], [LEN - 4, DEEP - 4], [4, CHAISE - 4], [DEEP - 4, CHAISE - 4]]) {
+    lCyl(w, s, 1.5, 0, LEG, black);
+  }
+  l(0, 0, LEN, DEEP, LEG, BASE_H, fabric);              // frame
+  l(0, DEEP, DEEP, CHAISE, LEG, BASE_H, fabric);
+  l(0, 0, LEN - ARM, 16, BASE_H, 70, fabric);           // back
+  l(LEN - ARM, 0, LEN, DEEP, BASE_H, 62, fabric);       // west arm (the chaise end is open)
+  l(0.3, 16, DEEP - 0.3, CHAISE, BASE_H, SEAT, fabric); // seat cushions: chaise + two
+  const mid = (DEEP + LEN - ARM) / 2;
+  for (const [w1, w2] of [[DEEP, mid], [mid, LEN - ARM]]) l(w1 + 0.3, 16, w2 - 0.3, DEEP, BASE_H, SEAT, fabric);
+  const third = (LEN - ARM) / 3;                        // three back cushions
+  for (let i = 0; i < 3; i++) l(i * third + 0.3, 16, (i + 1) * third - 0.3, 34, SEAT, BACK, fabric);
+});
 // Fluffies "Peach" chaise sofa (ACE 4475493): 270 long × 95 deep × 62 high, light brown
 // velvet, chaise on the right (east end, along the east wall). Chaise length isn't
 // published; 160 assumed. Back on the north glass, facing the TV.
@@ -512,10 +602,32 @@ item('sofa', () => {
 // 65" TV, wall-mounted, centred on the south wall (int wall 728–905, face y = 568).
 // 145 × 83.5 cm with a slim bezel, ~3.5 cm off the wall, screen centre 110 cm.
 item('tv', () => {
-  const TV_W = 145 / CM_PER_PX, TV_D = 3.5 / CM_PER_PX, TVX = 815, FACE = 568;
+  const TV_W = 145 / CM_PER_PX, TV_D = 3.5 / CM_PER_PX, FACE = TV_WALL;
   const screen = mat(0x0b0d10, { roughness: 0.12, metalness: 0.3 });
   f(TVX - TV_W / 2, FACE - TV_D, TVX + TV_W / 2, FACE, 0.6825, 1.5175, MAT.appliance);
   f(TVX - TV_W / 2 + 0.4, FACE - TV_D - 0.1, TVX + TV_W / 2 - 0.4, FACE - TV_D, 0.688, 1.512, screen);
+});
+// zvz "STEPHAN" TV unit, 220 wide variant, oak: 50 deep, 57 high. Slab top and body with
+// rounded ends, six doors across the front, raised on two rounded plinths at the ends (plinth
+// height and door split read off the photo). Centred under the TV, back on the wall.
+item('tvUnit', () => {
+  const oak = mat(0xc9a57c), seam = mat(0x7a5a3c);
+  const CW = (LX - TVX) * CM_PER_PX, R = 25, HALF = 110 - R;       // centre (living cm), end radius
+  const CS = (TV_WALL - LY) * CM_PER_PX - R;                       // centre line of the depth
+  const slab = (r, h0, h1) => {
+    l(CW - HALF, CS - r, CW + HALF, CS + r, h0, h1, oak);
+    for (const d of [-HALF, HALF]) lCyl(CW + d, CS, r, h0, h1, oak);
+  };
+  slab(R, 53, 57);                                  // top
+  slab(R - 1, 14, 53);                              // body
+  for (const d of [-HALF, HALF]) {                  // plinths
+    lCyl(CW + d, CS, R - 3, 0, 14, oak);
+    l(CW + d, CS - R + 3, CW + d - Math.sign(d) * 20, CS + R - 3, 0, 14, oak);
+  }
+  for (let i = 1; i < 6; i++) {                     // door seams on the flat front
+    const w = CW - HALF + (i * 2 * HALF) / 6;
+    l(w - 0.3, CS - R + 0.6, w + 0.3, CS - R + 1.2, 16, 51, seam);
+  }
 });
 // Scale figure: average adult, 170 cm tall, 45 cm shoulders, standing between sofa and TV.
 item('figure', () => {
@@ -537,18 +649,33 @@ item('figure', () => {
 // Bedroom 3: double bed + wardrobe
 item('bed3', () => { f(56, 600, 195, 711, 0, 0.45, MAT.bed); f(56, 600, 72, 711, 0.45, 1.0, MAT.darkwood); f(73, 610, 95, 701, 0.45, 0.58, MAT.pillow); });
 item('wardrobe3', () => f(120, 722, 300, 761, 0, 2.3, MAT.cabinet));
-// Master: king bed + nightstands
-item('masterBed', () => { f(800, 578, 925, 717, 0, 0.45, MAT.bed); f(800, 578, 925, 590, 0.45, 1.1, MAT.darkwood); f(808, 592, 917, 612, 0.45, 0.58, MAT.pillow); });
-item('nightstandW', () => f(775, 580, 798, 610, 0, 0.5, MAT.darkwood));
-item('nightstandE', () => f(927, 580, 950, 610, 0, 0.5, MAT.darkwood));
 // Mamad: single bed + desk
 item('mamadBed', () => f(300, 1000, 363, 1139, 0, 0.45, MAT.bed));
 item('desk', () => f(168, 1104, 258, 1136, 0.72, 0.76, MAT.darkwood));
 // Main bathroom: tub, toilet, vanity
 f(160, 843, 272, 888, 0, 0.55, MAT.white); f(58, 812, 88, 842, 0, 0.42, MAT.white); f(100, 770, 150, 800, 0, 0.85, MAT.white);
-// En-suite: glass shower, toilet, vanity
-f(658, 650, 735, 652, 0, 2.0, MAT.glass); f(733, 650, 735, 705, 0, 2.0, MAT.glass); f(658, 703, 735, 705, 0, 2.0, MAT.glass);
-f(735, 770, 758, 796, 0, 0.42, MAT.white); f(658, 715, 690, 765, 0, 0.85, MAT.white);
+// Parents' hall (מבואה): MR BABY "NOVA" shelf unit, 72 wide × 44 deep × 159 high, white with
+// oak tops: two louvred doors under an open hutch with two shelves. Against the hall's west
+// wall in its south corner, facing east. Hutch depth (30) and the heights are read off the photo.
+item('novaShelf', () => {
+  const X0 = 656, Y0 = 637;                         // west-wall face, south-wall face (plan px)
+  const n = (d1, a1, d2, a2, h0, h1, m) =>          // d: out from the wall, a: north of the corner (cm)
+    f(X0 + d1 / CM_PER_PX, Y0 - a1 / CM_PER_PX, X0 + d2 / CM_PER_PX, Y0 - a2 / CM_PER_PX, h0 / 100, h1 / 100, m);
+  const white = MAT.cabinet, oak = mat(0xcfae84);
+  n(0, 0, 42, 72, 0, 66, white);                    // lower cabinet
+  for (const [a1, a2, knob] of [[0.5, 35.8, 31], [36.2, 71.5, 41]]) {
+    n(42, a1, 43.5, a2, 2, 65, white);              // door
+    for (let hh = 10; hh <= 57; hh += 4) n(43.5, a1 + 4, 44, a2 - 4, hh, hh + 1.2, white);   // louvres
+    n(44, knob - 1, 46, knob + 1, 54, 56, oak);
+  }
+  n(0, -0.5, 44.5, 72.5, 66, 69, oak);              // counter top
+  n(0, 0, 30, 2, 69, 156, white); n(0, 70, 30, 72, 69, 156, white); n(0, 2, 1.5, 70, 69, 156, white);
+  for (const hh of [97, 126]) n(1.5, 2, 30, 70, hh, hh + 2, white);
+  n(0, -0.5, 31, 72.5, 156, 159, oak);              // crown
+});
+// En-suite: glass front on the walled shower (130/80), toilet, vanity
+f(656, 697, 745, 699, 0, 2.0, MAT.glass);
+f(735, 775, 761, 808, 0, 0.42, MAT.white); f(656, 705, 688, 750, 0, 0.85, MAT.white);
 // Sun balcony: solid wall on the west side (hatched in the sketch), jacuzzi in the
 // north-east corner, and the walled enclosure off the west wall.
 v(48, 25, 543, T.ext);
@@ -782,6 +909,7 @@ function enterWalk() {
   walking = true;
   controls.enabled = false;
   cutPlane.constant = H + 0.1;          // full-height walls while inside
+  dims.position.y = 0;
   document.getElementById('cut').value = '2.8';
   camera.position.set(wx(640), EYE, wz(470));  // living room, looking toward the kitchen
   camera.lookAt(wx(400), EYE, wz(430));
@@ -866,6 +994,7 @@ toggle('tPergola', (on) => { pergola.visible = on; });
 toggle('tFurniture', (on) => { furniture.visible = on; });
 toggle('tPlan', (on) => { plan.visible = on; });
 toggle('tElec', (on) => { electric.visible = on; });
+toggle('tDims', (on) => { dims.visible = on; });
 
 // ---------------------------------------------------------------------------
 // Moving furniture: drag a piece across the floor, then save — written into the
@@ -1026,6 +1155,7 @@ saveBtn.onclick = async () => {
 document.getElementById('cut').oninput = (e) => {
   const value = Number(e.target.value);
   cutPlane.constant = value >= 2.8 ? H + 0.1 : value;
+  dims.position.y = Math.min(value, H) - H;      // wall lengths sit on the cut wall tops
 };
 
 window.addEventListener('resize', () => {
