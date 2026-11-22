@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Apartment 25 — 3D Floor Plan (Three.js)</title>
+    <style>
+        :root {
+            --bg-panel: rgba(18, 22, 28, 0.88);
+            --border: rgba(255, 255, 255, 0.12);
+            --accent: #3b82f6;
+            --text: #f1f5f9;
+            --muted: #94a3b8;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            overflow: hidden;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            background: #e8ecf1;
+            color: var(--text);
+        }
+        #canvas-container { width: 100vw; height: 100vh; position: relative; }
+
+        /* Sidebar UI */
+        #ui-panel {
+            position: fixed;
+            top: 14px;
+            left: 14px;
+            width: 320px;
+            max-height: calc(100vh - 28px);
+            overflow-y: auto;
+            background: var(--bg-panel);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            z-index: 20;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+            font-size: 13px;
+        }
+        #ui-panel::-webkit-scrollbar { width: 6px; }
+        #ui-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+        h1 { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+        .subtitle { font-size: 11.5px; color: var(--muted); margin-bottom: 14px; }
+        .section {
+            border-top: 1px solid var(--border);
+            padding-top: 12px;
+            margin-top: 12px;
+        }
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+        .row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 7px;
+        }
+        .row label { color: #cbd5e1; font-size: 12.5px; flex: 1; }
+        .row input[type="range"] { width: 125px; accent-color: var(--accent); cursor: pointer; }
+        .row input[type="number"] {
+            width: 68px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            color: #fff;
+            padding: 3px 6px;
+            font-size: 12px;
+        }
+        .val { font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--muted); width: 38px; text-align: right; }
+
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 6px; }
+        .btn-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+        button, .file-btn {
+            background: rgba(255, 255, 255, 0.09);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 7px 8px;
+            border-radius: 7px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: center;
+            transition: background 0.15s, border-color 0.15s;
+            display: inline-block;
+        }
+        button:hover, .file-btn:hover {
+            background: rgba(59, 130, 246, 0.28);
+            border-color: var(--accent);
+        }
+        .file-btn { width: 100%; background: rgba(59, 130, 246, 0.22); border-color: rgba(59, 130, 246, 0.5); margin-bottom: 8px; }
+        input[type="file"] { display: none; }
+
+        .check-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            color: #e2e8f0;
+            font-size: 12.5px;
+        }
+        .check-row input { accent-color: var(--accent); cursor: pointer; }
+
+        /* Room 2D Labels */
+        .room-label {
+            background: rgba(15, 23, 42, 0.78);
+            color: #f8fafc;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            line-height: 1.25;
+            text-align: center;
+            pointer-events: none;
+            border: 1px solid rgba(255,255,255,0.18);
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .room-label .he { font-weight: 700; font-size: 12px; direction: rtl; display: block; }
+        .room-label .dim { color: #94a3b8; font-size: 10px; }
+
+        /* Drop Banner */
+        #drop-hint {
+            position: fixed;
+            bottom: 14px;
+            right: 14px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--muted);
+            z-index: 15;
+            pointer-events: none;
+        }
+        #inspector-box {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 9px;
+            margin-top: 6px;
+            display: none;
+        }
+        #inspector-name { font-weight: 600; color: #60a5fa; margin-bottom: 6px; font-size: 12px; }
+    </style>
+
+    <script type="importmap">
+        {
+          "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+          }
+        }
+    </script>
+</head>
+<body>
+<div id="canvas-container"></div>
+
+<div id="ui-panel">
+    <h1>Apt. 25 — Floor 7 (4 Rooms)</h1>
+    <div class="subtitle">1 unit = 1 meter • Click any wall to inspect/edit</div>
+
+    <div class="btn-grid">
+        <button id="cam-iso">3D View</button>
+        <button id="cam-top">Top Plan</button>
+        <button id="cam-walk">Interior</button>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Blueprint Ground Overlay</div>
+        <label class="file-btn">
+            Upload Floorplan Image (PNG / JPG)
+            <input type="file" id="blueprint-upload" accept="image/*" />
+        </label>
+        <div class="row">
+            <label>Plan Opacity</label>
+            <input type="range" id="bp-opacity" min="0" max="1" step="0.05" value="0.85" />
+            <span class="val" id="bp-opacity-val">0.85</span>
+        </div>
+        <div class="row">
+            <label>Floor Opacity</label>
+            <input type="range" id="floor-opacity" min="0" max="1" step="0.05" value="1.0" />
+            <span class="val" id="floor-opacity-val">1.00</span>
+        </div>
+        <div class="row">
+            <label>Scale (Width m)</label>
+            <input type="range" id="bp-scale" min="12" max="20" step="0.05" value="15.60" />
+            <span class="val" id="bp-scale-val">15.60</span>
+        </div>
+        <div class="row">
+            <label>Offset X (m)</label>
+            <input type="range" id="bp-x" min="-2" max="8" step="0.02" value="3.43" />
+            <span class="val" id="bp-x-val">3.43</span>
+        </div>
+        <div class="row">
+            <label>Offset Z (m)</label>
+            <input type="range" id="bp-z" min="-3" max="8" step="0.02" value="2.00" />
+            <span class="val" id="bp-z-val">2.00</span>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">3D Architecture Layers</div>
+        <div class="row">
+            <label>Wall Height</label>
+            <input type="range" id="wall-height" min="0.15" max="3.0" step="0.05" value="2.80" />
+            <span class="val" id="wall-height-val">2.80m</span>
+        </div>
+        <label class="check-row"><input type="checkbox" id="chk-openings" checked /> Doors & Glass Windows</label>
+        <label class="check-row"><input type="checkbox" id="chk-pergola" checked /> Pergola & Balcony Railings</label>
+        <label class="check-row"><input type="checkbox" id="chk-fixtures" checked /> Kitchen, Jacuzzi & Baths</label>
+        <label class="check-row"><input type="checkbox" id="chk-labels" checked /> Room Labels (עברית / EN)</label>
+        <label class="check-row"><input type="checkbox" id="chk-edges" checked /> Crisp Architectural Edges</label>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Wall Inspector (Click a Wall)</div>
+        <div style="font-size:11.5px; color:var(--muted);" id="inspector-empty">
+            Click any 3D wall segment in the scene to view or fine-tune its coordinates.
+        </div>
+        <div id="inspector-box">
+            <div id="inspector-name">Wall</div>
+            <div class="row"><label>Start X1 (m)</label><input type="number" step="0.05" id="w-x1" /></div>
+            <div class="row"><label>Start Z1 (m)</label><input type="number" step="0.05" id="w-z1" /></div>
+            <div class="row"><label>End X2 (m)</label><input type="number" step="0.05" id="w-x2" /></div>
+            <div class="row"><label>End Z2 (m)</label><input type="number" step="0.05" id="w-z2" /></div>
+            <div class="row"><label>Thickness (m)</label><input type="number" step="0.02" min="0.05" id="w-th" /></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Export</div>
+        <div class="btn-grid-2">
+            <button id="btn-export-glb">Export .GLB</button>
+            <button id="btn-export-json">Export .JSON</button>
+        </div>
+    </div>
+</div>
+
+<div id="drop-hint">Tip: Drag & drop your floorplan PNG/JPG anywhere • Orbit: Left-Click • Pan: Right-Click</div>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+    import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+    // =========================================================================
+    // 1. ARCHITECTURAL CONFIGURATION (Meters — Origin (0,0) = Kitchen Inner NW)
+    // =========================================================================
+    const CONFIG = {
+        wallHeight: 2.80,
+        showOpenings: true,
+        showPergola: true,
+        showFixtures: true,
+        showLabels: true,
+        showEdges: true,
+        floorOpacity: 1.0,
+        blueprint: { width: 15.60, offsetX: 3.43, offsetZ: 2.00, opacity: 0.85, aspect: 1.47 }
+    };
+
+    // Editable Wall Definitions extracted from 1:50 blueprint dimensions
+    const WALLS = [
+        // --- Exterior Envelope ---
+        {
+            id: 'ext_north', name: 'North Exterior Wall (Kitchen / Dining / Living)',
+            x1: -0.25, z1: -0.125, x2: 9.04, z2: -0.125, thickness: 0.25, type: 'exterior',
+            openings: [
+                { offset: 1.85, width: 1.20, sill: 1.10, height: 1.20, kind: 'window' },     // Kitchen window (120+30)
+                { offset: 4.35, width: 3.10, sill: 0.00, height: 2.30, kind: 'sliding' }     // Main balcony sliding door
+            ]
+        },
+        {
+            id: 'ext_kitchen_west', name: 'Kitchen West Exterior Wall',
+            x1: -0.125, z1: 0.00, x2: -0.125, z2: 3.43, thickness: 0.25, type: 'exterior', openings: []
+        },
+        {
+            id: 'ext_bed3_north', name: 'Bedroom 3 North Exterior Wall',
+            x1: -3.65, z1: 3.555, x2: 0.00, z2: 3.555, thickness: 0.25, type: 'exterior',
+            openings: [
+                { offset: 1.85, width: 1.40, sill: 1.05, height: 1.25, kind: 'window' }      // Bed 3 window (140 / 120+30)
+            ]
+        },
+        {
+            id: 'ext_west_bed3', name: 'West Exterior Wall (Bedroom 3 & Laundry)',
+            x1: -3.525, z1: 3.68, x2: -3.525, z2: 8.67, thickness: 0.25, type: 'exterior',
+            openings: [
+                { offset: 3.45, width: 1.25, sill: 0.90, height: 1.40, kind: 'louver' }      // Laundry screen opening
+            ]
+        },
+        {
+            id: 'ext_bath_south', name: 'Main Bathroom / Laundry South Exterior Wall',
+            x1: -3.65, z1: 8.795, x2: -1.24, z2: 8.795, thickness: 0.25, type: 'exterior', openings: []
+        },
+        {
+            id: 'ext_east_living_master', name: 'East Exterior Wall (Living & Master)',
+            x1: 8.90, z1: 0.00, x2: 8.90, z2: 7.05, thickness: 0.28, type: 'exterior',
+            openings: [
+                { offset: 0.35, width: 1.80, sill: 0.30, height: 2.00, kind: 'sliding' },    // Living NE glass opening
+                { offset: 2.40, width: 0.95, sill: 0.30, height: 2.00, kind: 'window' }      // Living SE window
+            ]
+        },
+        {
+            id: 'ext_master_south', name: 'Master & En-Suite South Exterior Wall',
+            x1: 3.55, z1: 7.175, x2: 9.04, z2: 7.175, thickness: 0.25, type: 'exterior',
+            openings: [
+                { offset: 0.95, width: 0.70, sill: 0.00, height: 2.05, kind: 'door' },       // Service balcony exit (70)
+                { offset: 2.60, width: 2.20, sill: 0.30, height: 2.00, kind: 'window' }      // Master south window (220)
+            ]
+        },
+
+        // --- Reinforced Mamad (Safe Room - ממ"ד / חדר שינה 2) ---
+        {
+            id: 'mamad_west', name: 'Mamad West Reinforced Wall',
+            x1: -1.09, z1: 8.67, x2: -1.09, z2: 12.55, thickness: 0.30, type: 'mamad',
+            openings: [
+                { offset: 1.85, width: 1.00, sill: 1.05, height: 1.05, kind: 'window' }      // Blast window (100)
+            ]
+        },
+        {
+            id: 'mamad_south', name: 'Mamad South Reinforced Wall (285 inner)',
+            x1: -1.24, z1: 12.70, x2: 2.21, z2: 12.70, thickness: 0.30, type: 'mamad', openings: []
+        },
+        {
+            id: 'mamad_east', name: 'Mamad East Reinforced Wall (363 inner)',
+            x1: 2.06, z1: 8.67, x2: 2.06, z2: 12.55, thickness: 0.30, type: 'mamad', openings: []
+        },
+        {
+            id: 'mamad_north', name: 'Mamad North Blast Wall',
+            x1: -0.94, z1: 8.795, x2: 1.91, z2: 8.795, thickness: 0.25, type: 'mamad',
+            openings: [
+                { offset: 1.85, width: 0.80, sill: 0.00, height: 2.00, kind: 'blast_door' }  // Steel Mamad door (80/200)
+            ]
+        },
+
+        // --- Building Core / Lobby Separation Walls ---
+        {
+            id: 'core_corridor_east', name: 'Corridor East Core Wall (Lobby / Elevator)',
+            x1: 2.01, z1: 3.74, x2: 2.01, z2: 8.67, thickness: 0.20, type: 'exterior', openings: []
+        },
+        {
+            id: 'core_entrance_wall', name: 'Main Entrance & Elevator North Core Wall',
+            x1: 1.91, z1: 3.64, x2: 5.31, z2: 3.64, thickness: 0.20, type: 'exterior',
+            openings: [
+                { offset: 1.60, width: 1.05, sill: 0.00, height: 2.10, kind: 'entry_door' }  // Main Entrance (כניסה 105/210)
+            ]
+        },
+        {
+            id: 'core_vestibule_west', name: 'Vestibule / Electrical Panel Wall (100)',
+            x1: 5.21, z1: 3.74, x2: 5.21, z2: 4.64, thickness: 0.20, type: 'exterior', openings: []
+        },
+        {
+            id: 'core_shower_north', name: 'Master Shower North Wall (130)',
+            x1: 4.05, z1: 4.64, x2: 5.55, z2: 4.64, thickness: 0.16, type: 'exterior', openings: []
+        },
+        {
+            id: 'core_shower_west', name: 'Master Shower West Step Wall',
+            x1: 4.13, z1: 4.64, x2: 4.13, z2: 5.50, thickness: 0.16, type: 'exterior', openings: []
+        },
+        {
+            id: 'core_ensuite_step', name: 'Master En-Suite Niche Step (45)',
+            x1: 3.65, z1: 5.50, x2: 4.13, z2: 5.50, thickness: 0.16, type: 'exterior', openings: []
+        },
+        {
+            id: 'core_ensuite_west', name: 'Master En-Suite West Lobby Wall',
+            x1: 3.65, z1: 5.50, x2: 3.65, z2: 7.05, thickness: 0.20, type: 'exterior', openings: []
+        },
+
+        // --- Interior Partition Walls (10 cm) ---
+        {
+            id: 'int_kitchen_south', name: 'Kitchen South Stub Wall (81)',
+            x1: 0.00, z1: 3.48, x2: 0.81, z2: 3.48, thickness: 0.10, type: 'interior', openings: []
+        },
+        {
+            id: 'int_corridor_west', name: 'Corridor West Wall (Bed 3 & Main Bath)',
+            x1: 0.81, z1: 3.48, x2: 0.81, z2: 8.67, thickness: 0.10, type: 'interior',
+            openings: [
+                { offset: 1.95, width: 0.80, sill: 0.00, height: 2.10, kind: 'door' },       // Bedroom 3 Door (80/210)
+                { offset: 3.55, width: 0.80, sill: 0.00, height: 2.10, kind: 'door' }        // Main Bathroom Door (80/210)
+            ]
+        },
+        {
+            id: 'int_bed3_south', name: 'Bedroom 3 / Main Bathroom Partition (421)',
+            x1: -3.40, z1: 6.78, x2: 0.81, z2: 6.78, thickness: 0.10, type: 'interior', openings: []
+        },
+        {
+            id: 'int_bath_laundry', name: 'Main Bathroom / Laundry Screen Wall',
+            x1: -1.95, z1: 6.78, x2: -1.95, z2: 8.67, thickness: 0.15, type: 'interior',
+            openings: [
+                { offset: 0.55, width: 0.75, sill: 1.15, height: 0.90, kind: 'window' }
+            ]
+        },
+        {
+            id: 'int_living_master', name: 'Living / Master Bedroom Partition (250)',
+            x1: 6.30, z1: 3.59, x2: 8.76, z2: 3.59, thickness: 0.10, type: 'interior', openings: []
+        },
+        {
+            id: 'int_master_chamfer', name: 'Master Bedroom 45° Entry Wall',
+            x1: 6.30, z1: 3.59, x2: 5.50, z2: 4.64, thickness: 0.10, type: 'interior',
+            openings: [
+                { offset: 0.24, width: 0.82, sill: 0.00, height: 2.10, kind: 'door' }        // Chamfered Master Door (80/210)
+            ]
+        },
+        {
+            id: 'int_master_ensuite', name: 'Master / En-Suite Partition Wall',
+            x1: 5.50, z1: 4.64, x2: 5.50, z2: 7.05, thickness: 0.10, type: 'interior',
+            openings: [
+                { offset: 0.95, width: 0.72, sill: 0.00, height: 2.10, kind: 'door' }        // En-suite Door (70/210)
+            ]
+        }
+    ];
+
+    // =========================================================================
+    // 2. THREE.JS SCENE, RENDERERS & LIGHTING
+    // =========================================================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xe6ebf0);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 200);
+    camera.position.set(13.5, 16.5, 17.5);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    container.appendChild(renderer.domElement);
+
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    container.appendChild(labelRenderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(3.4, 0.8, 3.8);
+    controls.maxPolarAngle = Math.PI / 2 - 0.01;
+
+    // Lights
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xcbd5e1, 0.85);
+    hemiLight.position.set(0, 25, 0);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xfffaf0, 1.35);
+    dirLight.position.set(14, 22, -10);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(2048, 2048);
+    dirLight.shadow.camera.left = -14;
+    dirLight.shadow.camera.right = 18;
+    dirLight.shadow.camera.top = 18;
+    dirLight.shadow.camera.bottom = -14;
+    dirLight.shadow.bias = -0.0004;
+    scene.add(dirLight);
+
+    // Subtle ground reference grid
+    const grid = new THREE.GridHelper(36, 36, 0xb8c2cc, 0xd5dde5);
+    grid.position.set(3.5, -0.03, 4.0);
+    scene.add(grid);
+
+    // =========================================================================
+    // 3. SHARED MATERIALS
+    // =========================================================================
+    const MATS = {
+        exteriorWall: new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.82 }),
+        interiorWall: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.78 }),
+        mamadWall:    new THREE.MeshStandardMaterial({ color: 0xdbe1e6, roughness: 0.72 }),
+        selectedWall: new THREE.MeshStandardMaterial({ color: 0x60a5fa, roughness: 0.5, emissive: 0x1d4ed8, emissiveIntensity: 0.25 }),
+        aluminum:     new THREE.MeshStandardMaterial({ color: 0x2d3748, roughness: 0.35, metalness: 0.6 }),
+        glass:        new THREE.MeshPhysicalMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.34, roughness: 0.08, transmission: 0.4 }),
+        woodDoor:     new THREE.MeshStandardMaterial({ color: 0xd6b996, roughness: 0.65 }),
+        entryDoor:    new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.5 }),
+        blastDoor:    new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.4, metalness: 0.5 }),
+        concrete:     new THREE.MeshStandardMaterial({ color: 0xe2e6ea, roughness: 0.85 }),
+        edgeLine:     new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.38 }),
+
+        // Floors
+        floorMain:    new THREE.MeshStandardMaterial({ color: 0xede8df, roughness: 0.65, transparent: true }),
+        floorWood:    new THREE.MeshStandardMaterial({ color: 0xd9c3a3, roughness: 0.58, transparent: true }),
+        floorBath:    new THREE.MeshStandardMaterial({ color: 0xcbd5dc, roughness: 0.50, transparent: true }),
+        floorBalcony: new THREE.MeshStandardMaterial({ color: 0xd4d0c8, roughness: 0.80, transparent: true }),
+        floorCore:    new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.90, transparent: true, opacity: 0.45 }),
+
+        // Fixtures
+        cabinet:      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.45 }),
+        countertop:   new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.30 }),
+        water:        new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.15, transparent: true, opacity: 0.78 })
+    };
+
+    // Scene Layer Groups
+    const modelRoot = new THREE.Group();
+    scene.add(modelRoot);
+
+    const wallsGroup = new THREE.Group();
+    const floorsGroup = new THREE.Group();
+    const pergolaGroup = new THREE.Group();
+    const fixturesGroup = new THREE.Group();
+    const labelsGroup = new THREE.Group();
+    modelRoot.add(floorsGroup, wallsGroup, pergolaGroup, fixturesGroup, labelsGroup);
+
+    // Blueprint Ground Plane
+    let blueprintMesh = null;
+
+    // =========================================================================
+    // 4. GEOMETRY BUILDERS
+    // =========================================================================
+    function addEdges(mesh) {
+        if (!CONFIG.showEdges) return;
+        const edges = new THREE.EdgesGeometry(mesh.geometry, 25);
+        const line = new THREE.LineSegments(edges, MATS.edgeLine);
+        mesh.add(line);
+    }
+
+    function makeBox(w, h, d, mat, castShadow = true) {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+        mesh.castShadow = castShadow;
+        mesh.receiveShadow = true;
+        addEdges(mesh);
+        return mesh;
+    }
+
+    // Parametric Wall with Door & Window Cutouts
+    function buildWallMesh(wall, isSelected = false) {
+        const dx = wall.x2 - wall.x1;
+        const dz = wall.z2 - wall.z1;
+        const len = Math.hypot(dx, dz);
+        if (len < 0.01) return null;
+
+        const H = CONFIG.wallHeight;
+        const T = wall.thickness;
+        const baseMat = isSelected
+            ? MATS.selectedWall
+            : wall.type === 'mamad'
+                ? MATS.mamadWall
+                : wall.type === 'interior'
+                    ? MATS.interiorWall
+                    : MATS.exteriorWall;
+
+        const group = new THREE.Group();
+        group.position.set(wall.x1, 0, wall.z1);
+        group.rotation.y = -Math.atan2(dz, dx);
+        group.userData.wallId = wall.id;
+
+        const openings = (wall.openings || [])
+            .map(o => ({
+                ...o,
+                offset: Math.max(0.02, Math.min(len - 0.05, o.offset)),
+                width: Math.min(o.width, len - o.offset - 0.02)
+            }))
+            .filter(o => o.width > 0.05)
+            .sort((a, b) => a.offset - b.offset);
+
+        const tagWallPart = (mesh) => {
+            mesh.userData.wallId = wall.id;
+            group.add(mesh);
+        };
+
+        let cursor = 0;
+        for (const op of openings) {
+            // Solid segment before opening
+            if (op.offset > cursor + 0.005) {
+                const segW = op.offset - cursor;
+                const seg = makeBox(segW, H, T, baseMat);
+                seg.position.set(cursor + segW / 2, H / 2, 0);
+                tagWallPart(seg);
+            }
+
+            const cx = op.offset + op.width / 2;
+            const sillH = Math.min(op.sill || 0, H);
+            const topStart = Math.min((op.sill || 0) + op.height, H);
+
+            // Sill block below window
+            if (sillH > 0.01) {
+                const sill = makeBox(op.width, sillH, T, baseMat);
+                sill.position.set(cx, sillH / 2, 0);
+                tagWallPart(sill);
+            }
+
+            // Lintel / header block above opening
+            if (H - topStart > 0.01) {
+                const lintelH = H - topStart;
+                const lintel = makeBox(op.width, lintelH, T, baseMat);
+                lintel.position.set(cx, topStart + lintelH / 2, 0);
+                tagWallPart(lintel);
+            }
+
+            // Doors & Windows 3D Inserts
+            const clearH = topStart - sillH;
+            if (CONFIG.showOpenings && clearH > 0.25) {
+                const insert = buildOpeningInsert(op, clearH, T);
+                insert.position.set(cx, sillH, 0);
+                group.add(insert);
+            }
+
+            cursor = op.offset + op.width;
+        }
+
+        // Trailing solid segment
+        if (len > cursor + 0.005) {
+            const remW = len - cursor;
+            const tail = makeBox(remW, H, T, baseMat);
+            tail.position.set(cursor + remW / 2, H / 2, 0);
+            tagWallPart(tail);
+        }
+
+        return group;
+    }
+
+    function buildOpeningInsert(op, clearH, wallT) {
+        const g = new THREE.Group();
+        const w = op.width;
+
+        if (op.kind === 'window' || op.kind === 'sliding' || op.kind === 'louver') {
+            const frameT = 0.045;
+            const depth = Math.min(wallT * 0.6, 0.10);
+            // Outer aluminum frame
+            const topBar = makeBox(w, frameT, depth, MATS.aluminum, false);
+            topBar.position.set(0, clearH - frameT / 2, 0);
+            const botBar = makeBox(w, frameT, depth, MATS.aluminum, false);
+            botBar.position.set(0, frameT / 2, 0);
+            const leftBar = makeBox(frameT, clearH, depth, MATS.aluminum, false);
+            leftBar.position.set(-w / 2 + frameT / 2, clearH / 2, 0);
+            const rightBar = makeBox(frameT, clearH, depth, MATS.aluminum, false);
+            rightBar.position.set(w / 2 - frameT / 2, clearH / 2, 0);
+            g.add(topBar, botBar, leftBar, rightBar);
+
+            if (op.kind === 'sliding') {
+                const midBar = makeBox(frameT, clearH, depth * 1.05, MATS.aluminum, false);
+                midBar.position.set(0, clearH / 2, 0);
+                g.add(midBar);
+            }
+
+            const pane = new THREE.Mesh(new THREE.BoxGeometry(w - frameT * 2, clearH - frameT * 2, 0.018), MATS.glass);
+            pane.position.set(0, clearH / 2, 0);
+            g.add(pane);
+        } else {
+            // Door Frame + Slightly Open Door Leaf
+            const jambT = 0.04;
+            const leftJ = makeBox(jambT, clearH, wallT + 0.02, MATS.aluminum, false);
+            leftJ.position.set(-w / 2 + jambT / 2, clearH / 2, 0);
+            const rightJ = makeBox(jambT, clearH, wallT + 0.02, MATS.aluminum, false);
+            rightJ.position.set(w / 2 - jambT / 2, clearH / 2, 0);
+            const headJ = makeBox(w, jambT, wallT + 0.02, MATS.aluminum, false);
+            headJ.position.set(0, clearH - jambT / 2, 0);
+            g.add(leftJ, rightJ, headJ);
+
+            const doorMat = op.kind === 'entry_door'
+                ? MATS.entryDoor
+                : op.kind === 'blast_door'
+                    ? MATS.blastDoor
+                    : MATS.woodDoor;
+
+            const pivot = new THREE.Group();
+            pivot.position.set(-w / 2 + jambT, 0, 0);
+            const leafW = w - jambT * 2;
+            const leaf = makeBox(leafW, clearH - jambT, 0.045, doorMat, true);
+            leaf.position.set(leafW / 2, (clearH - jambT) / 2, 0);
+            pivot.add(leaf);
+            pivot.rotation.y = -0.48; // Slightly ajar so doorway flow is clear
+            g.add(pivot);
+        }
+        return g;
+    }
+
+    // =========================================================================
+    // 5. FLOORS, BALCONIES, PERGOLA, FIXTURES & LABELS
+    // =========================================================================
+    function buildFloors() {
+        floorsGroup.clear();
+        const slabT = 0.06;
+
+        const addZoneRect = (x1, z1, x2, z2, mat, yOffset = 0) => {
+            const w = Math.abs(x2 - x1);
+            const d = Math.abs(z2 - z1);
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, slabT, d), mat);
+            mesh.position.set((x1 + x2) / 2, -slabT / 2 + yOffset, (z1 + z2) / 2);
+            mesh.receiveShadow = true;
+            floorsGroup.add(mesh);
+        };
+
+        // Main Living / Dining / Kitchen + Corridor + Master Vestibule
+        addZoneRect(0.00, 0.00, 8.76, 3.59, MATS.floorMain);
+        addZoneRect(0.81, 3.48, 1.91, 8.67, MATS.floorMain);
+        addZoneRect(5.21, 3.59, 6.30, 4.64, MATS.floorMain);
+
+        // Bedrooms (Wood Parquet)
+        addZoneRect(-3.40, 3.68, 0.81, 6.78, MATS.floorWood);   // Bedroom 3
+        addZoneRect(-0.94, 8.92, 1.91, 12.55, MATS.floorWood);  // Mamad / Bedroom 2
+        addZoneRect(5.50, 3.64, 8.76, 7.05, MATS.floorWood);    // Master Bedroom
+
+        // Bathrooms (Stone Tile)
+        addZoneRect(-3.50, 6.78, 0.81, 8.67, MATS.floorBath);   // Main Bathroom + Laundry
+        addZoneRect(3.65, 4.64, 5.50, 7.05, MATS.floorBath);    // Master En-Suite
+
+        // Sun Balcony (L-shape top + left + right Living ledge) & Service Balcony
+        addZoneRect(-3.40, -4.09, 10.42, -0.25, MATS.floorBalcony, -0.01); // Top Sun Balcony (13.82m x 3.84m)
+        addZoneRect(-3.40, -0.25, -0.25, 3.43, MATS.floorBalcony, -0.01);  // Left Sun Balcony wing
+        addZoneRect(9.04, -0.25, 10.42, 3.64, MATS.floorBalcony, -0.01);   // Right Living Room terrace (138cm)
+        addZoneRect(3.65, 7.30, 9.04, 8.22, MATS.floorBalcony, -0.01);     // Service / Laundry Balcony (535x92)
+
+        // Context Ghost: Floor 7 Lobby & Elevator Core (לובי קומה 7)
+        addZoneRect(2.11, 3.74, 3.65, 8.67, MATS.floorCore, -0.015);
+        addZoneRect(3.65, 3.74, 5.21, 4.64, MATS.floorCore, -0.015);
+    }
+
+    function buildPergolaAndRailings() {
+        pergolaGroup.clear();
+        if (!CONFIG.showPergola) return;
+
+        const addGlassRailing = (x1, z1, x2, z2) => {
+            const dx = x2 - x1, dz = z2 - z1;
+            const len = Math.hypot(dx, dz);
+            const g = new THREE.Group();
+            g.position.set(x1, 0, z1);
+            g.rotation.y = -Math.atan2(dz, dx);
+
+            // Low concrete curb (22cm) + glass (85cm) + top aluminum handrail
+            const curb = makeBox(len, 0.22, 0.14, MATS.concrete);
+            curb.position.set(len / 2, 0.11, 0);
+            const glass = new THREE.Mesh(new THREE.BoxGeometry(len - 0.04, 0.84, 0.02), MATS.glass);
+            glass.position.set(len / 2, 0.22 + 0.42, 0);
+            const rail = makeBox(len, 0.045, 0.07, MATS.aluminum, false);
+            rail.position.set(len / 2, 1.08, 0);
+            g.add(curb, glass, rail);
+            pergolaGroup.add(g);
+        };
+
+        // Sun Balcony Perimeter Railings
+        addGlassRailing(-3.40, -4.09, 10.42, -4.09); // North 13.82m railing
+        addGlassRailing(10.42, -4.09, 10.42, 3.64);  // East Jacuzzi & Terrace railing
+        addGlassRailing(10.42, 3.64, 9.04, 3.64);    // South return on East Terrace
+        addGlassRailing(-3.40, -4.09, -3.40, 3.55);  // West Balcony railing
+
+        // Service Balcony Screen Railing (South)
+        addGlassRailing(3.65, 8.22, 9.04, 8.22);
+        addGlassRailing(9.04, 7.30, 9.04, 8.22);
+        addGlassRailing(3.65, 7.30, 3.65, 8.22);
+
+        // Concrete Pergola Beams (פרגולה קורות בטון — 9.19m x 2.15m)
+        const beamY = Math.max(CONFIG.wallHeight - 0.12, 2.20);
+        const pX1 = -0.25, pX2 = 8.94, pZ1 = -2.40, pZ2 = -0.25;
+        const frontBeam = makeBox(pX2 - pX1, 0.22, 0.20, MATS.concrete);
+        frontBeam.position.set((pX1 + pX2) / 2, beamY, pZ1);
+        const leftBeam = makeBox(0.20, 0.22, pZ2 - pZ1, MATS.concrete);
+        leftBeam.position.set(pX1 + 0.10, beamY, (pZ1 + pZ2) / 2);
+        const rightBeam = makeBox(0.20, 0.22, pZ2 - pZ1, MATS.concrete);
+        rightBeam.position.set(pX2 - 0.10, beamY, (pZ1 + pZ2) / 2);
+        pergolaGroup.add(frontBeam, leftBeam, rightBeam);
+
+        for (let x = pX1 + 0.75; x < pX2 - 0.3; x += 0.68) {
+            const rib = makeBox(0.10, 0.16, pZ2 - pZ1 - 0.2, MATS.concrete);
+            rib.position.set(x, beamY, (pZ1 + pZ2) / 2);
+            pergolaGroup.add(rib);
+        }
+    }
+
+    function buildFixtures() {
+        fixturesGroup.clear();
+        if (!CONFIG.showFixtures) return;
+
+        // 1. Kitchen L-Counters & Built-in Tall Unit (מטבח)
+        const tallUnit = makeBox(0.62, Math.min(2.15, CONFIG.wallHeight), 1.25, MATS.cabinet);
+        tallUnit.position.set(0.31, Math.min(2.15, CONFIG.wallHeight) / 2, 2.75);
+        const westCounter = makeBox(0.62, 0.88, 2.12, MATS.cabinet);
+        westCounter.position.set(0.31, 0.44, 1.06);
+        const westTop = makeBox(0.64, 0.04, 2.14, MATS.countertop);
+        westTop.position.set(0.32, 0.90, 1.06);
+
+        const northCounter = makeBox(2.25, 0.88, 0.62, MATS.cabinet);
+        northCounter.position.set(1.75, 0.44, 0.31);
+        const northTop = makeBox(2.27, 0.04, 0.64, MATS.countertop);
+        northTop.position.set(1.75, 0.90, 0.32);
+        fixturesGroup.add(tallUnit, westCounter, westTop, northCounter, northTop);
+
+        // 2. Jacuzzi on NE Sun Balcony (ג'קוזי 202x202)
+        const jacShell = makeBox(2.02, 0.78, 2.02, MATS.cabinet);
+        jacShell.position.set(9.32, 0.39, -2.95);
+        const jacWater = new THREE.Mesh(new THREE.CylinderGeometry(0.82, 0.75, 0.05, 28), MATS.water);
+        jacWater.position.set(9.32, 0.77, -2.95);
+        fixturesGroup.add(jacShell, jacWater);
+
+        // 3. Main Bathroom Bathtub (160x70) & Vanity
+        const tub = makeBox(1.60, 0.52, 0.72, MATS.cabinet);
+        tub.position.set(-1.12, 0.26, 8.28);
+        const vanity1 = makeBox(1.10, 0.82, 0.50, MATS.cabinet);
+        vanity1.position.set(-1.05, 0.41, 7.05);
+        fixturesGroup.add(tub, vanity1);
+
+        // 4. Master En-Suite Glass Shower (מקלחון 130x80) & Vanity
+        const showerGlass = new THREE.Mesh(new THREE.BoxGeometry(1.25, Math.min(2.0, CONFIG.wallHeight), 0.02), MATS.glass);
+        showerGlass.position.set(4.82, Math.min(1.0, CONFIG.wallHeight / 2), 5.48);
+        const vanity2 = makeBox(0.48, 0.82, 1.05, MATS.cabinet);
+        vanity2.position.set(5.22, 0.41, 6.45);
+        fixturesGroup.add(showerGlass, vanity2);
+
+        // 5. Elevator Shaft Outline in Lobby (890x1150 context)
+        const elev = makeBox(1.15, 0.08, 1.45, MATS.concrete, false);
+        elev.position.set(2.75, 0.04, 4.55);
+        fixturesGroup.add(elev);
+    }
+
+    function buildLabels() {
+        // Remove existing CSS2DObjects properly
+        while (labelsGroup.children.length) {
+            const obj = labelsGroup.children[0];
+            if (obj.element && obj.element.parentNode) obj.element.parentNode.removeChild(obj.element);
+            labelsGroup.remove(obj);
+        }
+        if (!CONFIG.showLabels) return;
+
+        const rooms = [
+            { he: 'מרפסת שמש', en: 'Sun Balcony', dim: '13.82 × 3.84m', x: 4.2, z: -2.1 },
+            { he: 'ג׳קוזי', en: 'Jacuzzi', dim: '2.02 × 2.02m', x: 9.32, z: -2.95 },
+            { he: 'מטבח', en: 'Kitchen', dim: '3.43m', x: 1.45, z: 1.95 },
+            { he: 'פ. אוכל', en: 'Dining', dim: '3.54m', x: 3.9, z: 1.95 },
+            { he: 'חדר דיור', en: 'Living Room', dim: '3.55 × 3.54m', x: 6.9, z: 1.95 },
+            { he: 'כניסה', en: 'Entrance', dim: 'Apt. 25', x: 4.05, z: 3.35 },
+            { he: 'חדר שינה הורים', en: 'Master Bedroom', dim: '3.21 × 2.98m', x: 7.15, z: 5.45 },
+            { he: 'חדר רחצה', en: 'Master Bath', dim: '1.75 × 2.41m', x: 4.60, z: 6.05 },
+            { he: 'מרפסת שירות', en: 'Service Balcony', dim: '5.35 × 0.92m', x: 6.3, z: 7.78 },
+            { he: 'חדר שינה 3', en: 'Bedroom 3', dim: '3.40 × 3.10m', x: -1.55, z: 5.20 },
+            { he: 'חדר רחצה', en: 'Bathroom', dim: '2.68 × 1.79m', x: -0.65, z: 7.70 },
+            { he: 'ממ״ד / חדר שינה 2', en: 'Safe Room (Mamad)', dim: '2.85 × 3.63m', x: 0.48, z: 10.75 }
+        ];
+
+        for (const r of rooms) {
+            const div = document.createElement('div');
+            div.className = 'room-label';
+            div.innerHTML = `<span class="he">${r.he}</span>${r.en}<br><span class="dim">${r.dim}</span>`;
+            const label = new CSS2DObject(div);
+            label.position.set(r.x, 0.35, r.z);
+            labelsGroup.add(label);
+        }
+    }
+
+    // =========================================================================
+    // 6. REBUILD & SELECTION LOGIC
+    // =========================================================================
+    let selectedWallId = null;
+
+    function rebuildWalls() {
+        wallsGroup.clear();
+        for (const w of WALLS) {
+            const meshGroup = buildWallMesh(w, w.id === selectedWallId);
+            if (meshGroup) wallsGroup.add(meshGroup);
+        }
+    }
+
+    function rebuildAll() {
+        buildFloors();
+        rebuildWalls();
+        buildPergolaAndRailings();
+        buildFixtures();
+        buildLabels();
+        applyFloorOpacity();
+    }
+
+    function applyFloorOpacity() {
+        const op = CONFIG.floorOpacity;
+        [MATS.floorMain, MATS.floorWood, MATS.floorBath, MATS.floorBalcony].forEach(m => {
+            m.opacity = op;
+            m.visible = op > 0.02;
+        });
+    }
+
+    rebuildAll();
+
+    // =========================================================================
+    // 7. BLUEPRINT IMAGE UPLOAD & DRAG-AND-DROP OVERLAY
+    // =========================================================================
+    function updateBlueprintTransform() {
+        if (!blueprintMesh) return;
+        const w = CONFIG.blueprint.width;
+        const h = w * CONFIG.blueprint.aspect;
+        blueprintMesh.scale.set(w, h, 1);
+        blueprintMesh.position.set(CONFIG.blueprint.offsetX, -0.015, CONFIG.blueprint.offsetZ);
+        blueprintMesh.material.opacity = CONFIG.blueprint.opacity;
+        blueprintMesh.visible = CONFIG.blueprint.opacity > 0.01;
+    }
+
+    function loadBlueprintFile(file) {
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        new THREE.TextureLoader().load(url, (tex) => {
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            const img = tex.image;
+            CONFIG.blueprint.aspect = img.naturalHeight / img.naturalWidth;
+
+            if (blueprintMesh) {
+                blueprintMesh.material.map.dispose();
+                blueprintMesh.material.map = tex;
+                blueprintMesh.material.needsUpdate = true;
+            } else {
+                const geo = new THREE.PlaneGeometry(1, 1);
+                const mat = new THREE.MeshBasicMaterial({
+                    map: tex,
+                    transparent: true,
+                    opacity: CONFIG.blueprint.opacity,
+                    depthWrite: false
+                });
+                blueprintMesh = new THREE.Mesh(geo, mat);
+                blueprintMesh.rotation.x = -Math.PI / 2;
+                scene.add(blueprintMesh);
+            }
+
+            // Automatically make floors semi-transparent so blueprint lines show through rooms
+            CONFIG.floorOpacity = 0.25;
+            document.getElementById('floor-opacity').value = '0.25';
+            document.getElementById('floor-opacity-val').textContent = '0.25';
+            applyFloorOpacity();
+            updateBlueprintTransform();
+        });
+    }
+
+    document.getElementById('blueprint-upload').addEventListener('change', (e) => {
+        loadBlueprintFile(e.target.files[0]);
+    });
+
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            loadBlueprintFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    // =========================================================================
+    // 8. WALL CLICK INSPECTOR & UI CONTROLS
+    // =========================================================================
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let pointerDownPos = { x: 0, y: 0 };
+
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+        pointerDownPos = { x: e.clientX, y: e.clientY };
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+        if (Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y) > 5) return;
+
+        pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+        pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+
+        const hits = raycaster.intersectObjects(wallsGroup.children, true);
+        const hitWall = hits.find(h => h.object.userData && h.object.userData.wallId);
+
+        if (hitWall) {
+            selectedWallId = hitWall.object.userData.wallId;
+            populateInspector(WALLS.find(w => w.id === selectedWallId));
+        } else {
+            selectedWallId = null;
+            populateInspector(null);
+        }
+        rebuildWalls();
+    });
+
+    function populateInspector(wall) {
+        const emptyEl = document.getElementById('inspector-empty');
+        const boxEl = document.getElementById('inspector-box');
+        if (!wall) {
+            emptyEl.style.display = 'block';
+            boxEl.style.display = 'none';
+            return;
+        }
+        emptyEl.style.display = 'none';
+        boxEl.style.display = 'block';
+        document.getElementById('inspector-name').textContent = wall.name;
+        document.getElementById('w-x1').value = wall.x1;
+        document.getElementById('w-z1').value = wall.z1;
+        document.getElementById('w-x2').value = wall.x2;
+        document.getElementById('w-z2').value = wall.z2;
+        document.getElementById('w-th').value = wall.thickness;
+    }
+
+    ['w-x1', 'w-z1', 'w-x2', 'w-z2', 'w-th'].forEach((id) => {
+        document.getElementById(id).addEventListener('input', () => {
+            const wall = WALLS.find(w => w.id === selectedWallId);
+            if (!wall) return;
+            wall.x1 = parseFloat(document.getElementById('w-x1').value) || 0;
+            wall.z1 = parseFloat(document.getElementById('w-z1').value) || 0;
+            wall.x2 = parseFloat(document.getElementById('w-x2').value) || 0;
+            wall.z2 = parseFloat(document.getElementById('w-z2').value) || 0;
+            wall.thickness = Math.max(0.05, parseFloat(document.getElementById('w-th').value) || 0.1);
+            rebuildWalls();
+        });
+    });
+
+    // Sliders & Checkboxes
+    const bindRange = (id, valId, suffix, onChange) => {
+        const el = document.getElementById(id);
+        const valEl = document.getElementById(valId);
+        el.addEventListener('input', () => {
+            const v = parseFloat(el.value);
+            valEl.textContent = v.toFixed(2) + suffix;
+            onChange(v);
+        });
+    };
+
+    bindRange('wall-height', 'wall-height-val', 'm', (v) => {
+        CONFIG.wallHeight = v;
+        rebuildWalls();
+        buildPergolaAndRailings();
+        buildFixtures();
+    });
+    bindRange('bp-opacity', 'bp-opacity-val', '', (v) => { CONFIG.blueprint.opacity = v; updateBlueprintTransform(); });
+    bindRange('floor-opacity', 'floor-opacity-val', '', (v) => { CONFIG.floorOpacity = v; applyFloorOpacity(); });
+    bindRange('bp-scale', 'bp-scale-val', '', (v) => { CONFIG.blueprint.width = v; updateBlueprintTransform(); });
+    bindRange('bp-x', 'bp-x-val', '', (v) => { CONFIG.blueprint.offsetX = v; updateBlueprintTransform(); });
+    bindRange('bp-z', 'bp-z-val', '', (v) => { CONFIG.blueprint.offsetZ = v; updateBlueprintTransform(); });
+
+    const bindCheck = (id, key, fn) => {
+        document.getElementById(id).addEventListener('change', (e) => {
+            CONFIG[key] = e.target.checked;
+            fn();
+        });
+    };
+    bindCheck('chk-openings', 'showOpenings', rebuildWalls);
+    bindCheck('chk-pergola', 'showPergola', buildPergolaAndRailings);
+    bindCheck('chk-fixtures', 'showFixtures', buildFixtures);
+    bindCheck('chk-labels', 'showLabels', buildLabels);
+    bindCheck('chk-edges', 'showEdges', () => { rebuildWalls(); buildPergolaAndRailings(); buildFixtures(); });
+
+    // Camera Presets
+    document.getElementById('cam-iso').addEventListener('click', () => {
+        camera.position.set(13.5, 16.5, 17.5);
+        controls.target.set(3.4, 0.8, 3.8);
+    });
+    document.getElementById('cam-top').addEventListener('click', () => {
+        camera.position.set(3.43, 24.5, 4.21);
+        controls.target.set(3.43, 0, 4.20);
+    });
+    document.getElementById('cam-walk').addEventListener('click', () => {
+        camera.position.set(6.8, 1.65, 3.1);
+        controls.target.set(4.5, 1.45, -1.5);
+    });
+
+    // Export .GLB & .JSON
+    document.getElementById('btn-export-glb').addEventListener('click', () => {
+        const exporter = new GLTFExporter();
+        exporter.parse(
+            modelRoot,
+            (result) => {
+                const blob = new Blob([result], { type: 'application/octet-stream' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'apartment25_3d.glb';
+                a.click();
+            },
+            (err) => console.error(err),
+            { binary: true }
+        );
+    });
+
+    document.getElementById('btn-export-json').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify({ config: CONFIG, walls: WALLS }, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'apartment25_walls.json';
+        a.click();
+    });
+
+    // Resize & Render Loop
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+        labelRenderer.render(scene, camera);
+    }
+    animate();
+</script>
+</body>
+</html>

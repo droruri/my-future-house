@@ -34,6 +34,10 @@
   #panel input[type=range] { width: 100%; }
   #panel .wide { grid-column: 1 / -1; }
   #panel .hint { font-size: 11px; color: #94a3b8; margin-top: 10px; line-height: 1.5; }
+  #pending { margin-top: 10px; padding: 8px; border-radius: 8px; background: #eff6ff; font-size: 12px; }
+  #pending .group { margin: 6px 0 0; }
+  #saveStatus { font-size: 11px; color: #475569; margin-top: 6px; min-height: 1em; }
+  body.dragging, body.dragging canvas { cursor: grabbing; }
 </style>
 <script type="importmap">
 { "imports": {
@@ -61,9 +65,20 @@
   </div>
   <label for="cut">גובה חיתוך קירות</label>
   <input id="cut" dir="ltr" type="range" min="0.3" max="2.8" step="0.05" value="2.8" />
-  <div class="hint">גרירה — סיבוב · גלגלת — זום · לחצן ימני — הזזה · לחיצה כפולה — מרכז סיבוב<br />הליכה: עכבר — מבט · WASD / חצים — תנועה · Shift — מהר · Esc — יציאה<br />המידות משוערות מתוך השרטוט (קנה מידה ≈ 1.44 ס"מ לפיקסל).</div>
+  <div id="pending" hidden>
+    <div>רהיטים הוזזו — לשמור?</div>
+    <div class="group">
+      <button id="saveLayout">שמירה</button>
+      <button id="cancelLayout">ביטול</button>
+    </div>
+  </div>
+  <div id="saveStatus" role="status"></div>
+  <div class="hint">גרירת רהיט — הזזה (ואז שמירה) · גרירה — סיבוב · גלגלת — זום · לחצן ימני — הזזה · לחיצה כפולה — מרכז סיבוב<br />הליכה: עכבר — מבט · WASD / חצים — תנועה · Shift — מהר · Esc — יציאה<br />המידות משוערות מתוך השרטוט (קנה מידה ≈ 1.44 ס"מ לפיקסל).</div>
 </div>
 
+<!-- Approved furniture moves: item id → offset (m) from where the code draws it. Written by the
+     "שמירה" button; edit or reset to {} by hand if needed. -->
+<script type="application/json" id="layout">{"sofa":{"x":-0.03,"z":0.05},"jacuzzi":{"x":0.03,"z":0.04}}</script>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -315,7 +330,21 @@ railH(893, 600, 985); railV(985, 797, 893);
 // ---------------------------------------------------------------------------
 const furniture = new THREE.Group();
 scene.add(furniture);
-const f = (x1, y1, x2, y2, h0, h1, m) => box(x1, y1, x2, y2, h0, h1, m, furniture);
+let parent = furniture;                         // where f / kMesh add meshes; item() swaps it
+const f = (x1, y1, x2, y2, h0, h1, m) => box(x1, y1, x2, y2, h0, h1, m, parent);
+
+// A free-standing piece that can be dragged. Its meshes go into one group that sits at the
+// origin, so group.position is exactly the piece's offset from where the code draws it.
+const movable = new Map();                      // item id → group
+function item(id, build) {
+  const g = new THREE.Group();
+  g.userData.itemId = id;
+  furniture.add(g);
+  parent = g;
+  build();
+  parent = furniture;
+  movable.set(id, g);
+}
 
 // Kitchen (Da Cucina drawings, 19.12.2025). Local cm: e = east of the west-wall inner face,
 // s = south of the north-façade inner face, heights in cm above the floor.
@@ -333,7 +362,7 @@ function kMesh(geo, m, e, s, h) {
   const o = new THREE.Mesh(geo, m);
   o.position.set(wx(x), h / 100, wz(y));
   o.castShadow = o.receiveShadow = true;
-  furniture.add(o);
+  parent.add(o);
 }
 const kCyl = (e, s, r, h0, h1, m) => kMesh(new THREE.CylinderGeometry(r / 100, r / 100, (h1 - h0) / 100, 24), m, e, s, (h0 + h1) / 2);
 const kRing = (e, s, r0, r1, h, m) => kMesh(new THREE.RingGeometry(r0 / 100, r1 / 100, 40).rotateX(-Math.PI / 2), m, e, s, h);
@@ -455,7 +484,7 @@ for (const [e, s, r] of [[239, 150, 7], [239, 181, 9], [265, 150, 9], [265, 181,
   kRing(e, s, r - 1, r, TOP + 0.65, MAT.burner);
 }
 // Rug 247×160 in the aisle
-k(58.1, 79, 218.1, 326, 0, 1, MAT.rug);
+item('rug', () => k(58.1, 79, 218.1, 326, 0, 1, MAT.rug));
 // Living room. Local cm from the inner NE corner: w = west of the east-wall face,
 // s = south of the north-façade face, heights in cm.
 const LX = 902, LY = 311;                       // inner NE living corner (plan px)
@@ -467,7 +496,7 @@ function l(w1, s1, w2, s2, h0, h1, m) {
 // Fluffies "Peach" chaise sofa (ACE 4475493): 270 long × 95 deep × 62 high, light brown
 // velvet, chaise on the right (east end, along the east wall). Chaise length isn't
 // published; 160 assumed. Back on the north glass, facing the TV.
-{
+item('sofa', () => {
   const velvet = mat(0xa88f7c, { roughness: 0.95 });
   const SEAT = 42, BACK = 62, ARM = 55;
   l(0, 0, 270, 95, 0, SEAT, velvet);            // main seat block
@@ -475,17 +504,17 @@ function l(w1, s1, w2, s2, h0, h1, m) {
   l(95, 0, 270, 22, SEAT, BACK, velvet);        // back cushions
   l(0, 0, 95, 22, SEAT, BACK, velvet);          // back behind the chaise
   l(250, 22, 270, 95, SEAT, ARM, velvet);       // west arm
-}
+});
 // 65" TV, wall-mounted, centred on the south wall (int wall 728–905, face y = 568).
 // 145 × 83.5 cm with a slim bezel, ~3.5 cm off the wall, screen centre 110 cm.
-{
+item('tv', () => {
   const TV_W = 145 / CM_PER_PX, TV_D = 3.5 / CM_PER_PX, TVX = 815, FACE = 568;
   const screen = mat(0x0b0d10, { roughness: 0.12, metalness: 0.3 });
   f(TVX - TV_W / 2, FACE - TV_D, TVX + TV_W / 2, FACE, 0.6825, 1.5175, MAT.appliance);
   f(TVX - TV_W / 2 + 0.4, FACE - TV_D - 0.1, TVX + TV_W / 2 - 0.4, FACE - TV_D, 0.688, 1.512, screen);
-}
+});
 // Scale figure: average adult, 170 cm tall, 45 cm shoulders, standing between sofa and TV.
-{
+item('figure', () => {
   const skin = mat(0xe0b48f), shirt = mat(0x3b6ea5), pants = mat(0x2f3540);
   const W = 180, S = 220;                       // feet centre (local living cm)
   l(W - 20, S - 6, W - 3, S + 10, 0, 85, pants); // legs
@@ -499,16 +528,18 @@ function l(w1, s1, w2, s2, h0, h1, m) {
   head.scale.set(0.8, 1, 0.95);
   head.position.set(wx(hx), 1.6, wz(hy));         // 20 cm tall head → top at 170
   head.castShadow = true;
-  furniture.add(head);
-}
+  parent.add(head);
+});
 // Bedroom 3: double bed + wardrobe
-f(56, 600, 195, 711, 0, 0.45, MAT.bed); f(56, 600, 72, 711, 0.45, 1.0, MAT.darkwood); f(73, 610, 95, 701, 0.45, 0.58, MAT.pillow);
-f(120, 722, 300, 761, 0, 2.3, MAT.cabinet);
+item('bed3', () => { f(56, 600, 195, 711, 0, 0.45, MAT.bed); f(56, 600, 72, 711, 0.45, 1.0, MAT.darkwood); f(73, 610, 95, 701, 0.45, 0.58, MAT.pillow); });
+item('wardrobe3', () => f(120, 722, 300, 761, 0, 2.3, MAT.cabinet));
 // Master: king bed + nightstands
-f(800, 578, 925, 717, 0, 0.45, MAT.bed); f(800, 578, 925, 590, 0.45, 1.1, MAT.darkwood); f(808, 592, 917, 612, 0.45, 0.58, MAT.pillow);
-f(775, 580, 798, 610, 0, 0.5, MAT.darkwood); f(927, 580, 950, 610, 0, 0.5, MAT.darkwood);
+item('masterBed', () => { f(800, 578, 925, 717, 0, 0.45, MAT.bed); f(800, 578, 925, 590, 0.45, 1.1, MAT.darkwood); f(808, 592, 917, 612, 0.45, 0.58, MAT.pillow); });
+item('nightstandW', () => f(775, 580, 798, 610, 0, 0.5, MAT.darkwood));
+item('nightstandE', () => f(927, 580, 950, 610, 0, 0.5, MAT.darkwood));
 // Mamad: single bed + desk
-f(300, 1000, 363, 1139, 0, 0.45, MAT.bed); f(168, 1104, 258, 1136, 0.72, 0.76, MAT.darkwood);
+item('mamadBed', () => f(300, 1000, 363, 1139, 0, 0.45, MAT.bed));
+item('desk', () => f(168, 1104, 258, 1136, 0.72, 0.76, MAT.darkwood));
 // Main bathroom: tub, toilet, vanity
 f(160, 843, 272, 888, 0, 0.55, MAT.white); f(58, 812, 88, 842, 0, 0.42, MAT.white); f(100, 770, 150, 800, 0, 0.85, MAT.white);
 // En-suite: glass shower, toilet, vanity
@@ -518,7 +549,7 @@ f(735, 770, 758, 796, 0, 0.42, MAT.white); f(658, 715, 690, 765, 0, 0.85, MAT.wh
 // north-east corner, and the walled enclosure off the west wall.
 v(48, 25, 543, T.ext);
 // MSpa Cloud LR062-NA (ACE 4486681): round inflatable spa, Ø204 × 70 cm, 6 seats.
-{
+item('jacuzzi', () => {
   const cx = wx(907), cz = wz(107), R = 1.02, HT = 0.7;
   const spaWall = mat(0xd6d8da, { roughness: 0.7 }), spaRim = mat(0xeceeef, { roughness: 0.6 });
   const spaFloor = mat(0x8fa3b0), spaPanel = mat(0x30353a, { roughness: 0.4 });
@@ -526,7 +557,7 @@ v(48, 25, 543, T.ext);
     const o = new THREE.Mesh(geo, m);
     o.position.set(cx, y, cz);
     o.castShadow = o.receiveShadow = true;
-    furniture.add(o);
+    parent.add(o);
     return o;
   };
   // Outer inflated wall (open tube), padded top roll, inner wall, floor and water
@@ -540,10 +571,10 @@ v(48, 25, 543, T.ext);
   const panel = add(new THREE.BoxGeometry(0.18, 0.06, 0.1, 1, 1, 1), spaPanel, HT + 0.02);
   panel.position.x -= (R - 0.11) * Math.SQRT1_2; panel.position.z += (R - 0.11) * Math.SQRT1_2;
   panel.rotation.y = Math.PI / 4;
-}
+});
 f(56, 307, 141, 414, 0, 1.2, MAT.concrete);
 // Laundry: washer
-f(625, 830, 665, 870, 0, 0.85, MAT.white);
+item('washer', () => f(625, 830, 665, 870, 0, 0.85, MAT.white));
 
 // Concrete pergola over the sun balcony
 const pergola = new THREE.Group();
@@ -596,10 +627,14 @@ document.getElementById('viewTop').onclick = () => { exitWalk(); setView(true); 
 
 // Outside: double-click a surface to orbit around that point.
 const pick = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+function rayAt(e) {                   // aim `pick` through the mouse position
+  pointer.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+  pick.setFromCamera(pointer, camera);
+}
 renderer.domElement.addEventListener('dblclick', (e) => {
   if (walking) return;
-  const p = new THREE.Vector2((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
-  pick.setFromCamera(p, camera);
+  rayAt(e);
   const hit = pick.intersectObjects([walls, rails, furniture, plan], true)[0];
   if (hit) { controls.target.copy(hit.point); controls.update(); }
 });
@@ -705,6 +740,162 @@ toggle('tLabels', (on) => document.getElementById('labels').classList.toggle('hi
 toggle('tPergola', (on) => { pergola.visible = on; });
 toggle('tFurniture', (on) => { furniture.visible = on; });
 toggle('tPlan', (on) => { plan.visible = on; });
+
+// ---------------------------------------------------------------------------
+// Moving furniture: drag a piece across the floor, then save — written into the
+// #layout block of this very file, so it is there on the next load — or cancel.
+// ---------------------------------------------------------------------------
+// Saved layout { id: { x, z } } (metres). A bad entry is skipped, never fatal.
+try {
+  const saved = JSON.parse(document.getElementById('layout')?.textContent ?? '{}');
+  for (const [id, o] of Object.entries(saved ?? {})) {
+    const g = movable.get(id);
+    if (g && Number.isFinite(o?.x) && Number.isFinite(o?.z)) g.position.set(o.x, 0, o.z);
+    else console.warn('layout: skipped entry', id);
+  }
+} catch (err) {
+  console.warn('layout: unreadable, using the original positions', err);
+}
+
+const pendingEl = document.getElementById('pending');
+const statusEl = document.getElementById('saveStatus');
+const pending = new Map();            // moved group → its position before the first unsaved move
+const dragPlane = new THREE.Plane();
+const UP = new THREE.Vector3(0, 1, 0);
+const grab = new THREE.Vector3();
+const onPlane = new THREE.Vector3();
+let drag = null;                      // { group, start, pointerId }
+
+// Capture phase on the container runs before OrbitControls' listener on the canvas, so a
+// press on a piece turns orbiting off for that gesture.
+app.addEventListener('pointerdown', (e) => {
+  if (walking || !furniture.visible || e.button !== 0) return;
+  rayAt(e);
+  // First surface actually seen: walls block, walls above the cut height don't.
+  const hit = pick.intersectObjects([walls, furniture], true).find((h) => h.point.y <= cutPlane.constant);
+  let group = hit?.object;
+  while (group && !group.userData.itemId) group = group.parent;
+  if (!hit || !group) return;
+  controls.enabled = false;
+  dragPlane.setFromNormalAndCoplanarPoint(UP, hit.point);
+  grab.copy(group.position).sub(hit.point);
+  drag = { group, start: group.position.clone(), pointerId: e.pointerId };
+  renderer.domElement.setPointerCapture(e.pointerId);
+  document.body.classList.add('dragging');
+}, { capture: true });
+
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (!drag || e.pointerId !== drag.pointerId) return;
+  rayAt(e);
+  if (!pick.ray.intersectPlane(dragPlane, onPlane)) return;   // ray parallel to / away from the floor
+  drag.group.position.x = onPlane.x + grab.x;
+  drag.group.position.z = onPlane.z + grab.z;
+});
+
+function endDrag(e) {
+  if (!drag || e.pointerId !== drag.pointerId) return;
+  const { group, start } = drag;
+  drag = null;
+  controls.enabled = true;
+  document.body.classList.remove('dragging');
+  if (group.position.distanceToSquared(start) < 1e-6) return;   // a click, not a move
+  if (!pending.has(group)) pending.set(group, start);
+  pendingEl.hidden = false;
+  statusEl.textContent = '';
+}
+renderer.domElement.addEventListener('pointerup', endDrag);
+renderer.domElement.addEventListener('pointercancel', endDrag);
+
+document.getElementById('cancelLayout').onclick = () => {
+  for (const [group, start] of pending) group.position.copy(start);
+  pending.clear();
+  pendingEl.hidden = true;
+  statusEl.textContent = '';
+};
+
+// Writing back into the HTML needs the File System Access API (Chrome / Edge). The file
+// handle is kept in IndexedDB so the file is picked only once; after a reload the browser
+// asks once more for write permission.
+const LAYOUT_BLOCK = /(<script type="application\/json" id="layout">)[\s\S]*?(<\/script>)/;
+function idb(mode, op) {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open('my-house-3d', 1);
+    open.onupgradeneeded = () => open.result.createObjectStore('handles');
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const req = op(db.transaction('handles', mode).objectStore('handles'));
+      req.onsuccess = () => { db.close(); resolve(req.result); };
+      req.onerror = () => { db.close(); reject(req.error); };
+    };
+  });
+}
+let fileHandle = null;
+async function getFileHandle() {
+  if (fileHandle) return fileHandle;
+  try {
+    const stored = await idb('readonly', (s) => s.get('html'));
+    if (stored instanceof FileSystemFileHandle) fileHandle = stored;
+  } catch (err) {
+    console.warn('layout: no stored file handle', err);
+  }
+  if (!fileHandle) {
+    [fileHandle] = await window.showOpenFilePicker({ types: [{ description: 'HTML', accept: { 'text/html': ['.html'] } }] });
+    idb('readwrite', (s) => s.put(fileHandle, 'html')).catch((err) => console.warn('layout: handle not remembered', err));
+  }
+  return fileHandle;
+}
+function forgetFileHandle() {
+  fileHandle = null;
+  idb('readwrite', (s) => s.delete('html')).catch((err) => console.warn('layout: handle not forgotten', err));
+}
+function currentLayout() {
+  const out = {};
+  for (const [id, g] of movable) {
+    const x = Math.round(g.position.x * 100) / 100, z = Math.round(g.position.z * 100) / 100;   // 1 cm
+    if (x !== 0 || z !== 0) out[id] = { x, z };
+  }
+  return out;
+}
+
+const saveBtn = document.getElementById('saveLayout');
+saveBtn.onclick = async () => {
+  if (!('showOpenFilePicker' in window)) {
+    statusEl.textContent = 'שמירה לקובץ דורשת Chrome או Edge';
+    return;
+  }
+  saveBtn.disabled = true;
+  statusEl.textContent = 'שומר…';
+  try {
+    const handle = await getFileHandle();
+    if (await handle.queryPermission({ mode: 'readwrite' }) !== 'granted'
+      && await handle.requestPermission({ mode: 'readwrite' }) !== 'granted') {
+      statusEl.textContent = 'אין הרשאה לכתוב לקובץ — לא נשמר';
+      return;
+    }
+    const text = await (await handle.getFile()).text();   // fresh copy: keeps any edits made on disk
+    if (!LAYOUT_BLOCK.test(text)) {
+      forgetFileHandle();
+      statusEl.textContent = 'זה לא הקובץ הנכון — בחרו את my-house-3d.html';
+      return;
+    }
+    const json = JSON.stringify(currentLayout());
+    const out = await handle.createWritable();
+    await out.write(text.replace(LAYOUT_BLOCK, (_, open, close) => open + json + close));
+    await out.close();
+    pending.clear();
+    pendingEl.hidden = true;
+    statusEl.textContent = `נשמר בקובץ ${handle.name}`;
+  } catch (err) {
+    if (err?.name === 'AbortError') statusEl.textContent = 'לא נבחר קובץ — לא נשמר';
+    else {
+      console.error('layout: save failed', err);
+      statusEl.textContent = 'השמירה נכשלה — פרטים בקונסול';
+    }
+  } finally {
+    saveBtn.disabled = false;
+  }
+};
 
 document.getElementById('cut').oninput = (e) => {
   const value = Number(e.target.value);
