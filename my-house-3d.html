@@ -38,6 +38,9 @@
   #pending .group { margin: 6px 0 0; }
   #saveStatus { font-size: 11px; color: #475569; margin-top: 6px; min-height: 1em; }
   body.dragging, body.dragging canvas { cursor: grabbing; }
+  #labels .elbl { left: 0; top: 0; }
+  .elbl { font-size: 10px; line-height: 1.3; padding: 0 4px; border-radius: 6px; white-space: nowrap; background: rgba(255,255,255,0.85); color: #92400e; border: 1px solid #f59e0b; }
+  .elbl.sw { color: #1e3a8a; border-color: #3b82f6; }
 </style>
 <script type="importmap">
 { "imports": {
@@ -62,6 +65,7 @@
     <button id="tPergola" aria-pressed="true">פרגולה</button>
     <button id="tFurniture" aria-pressed="true">ריהוט</button>
     <button id="tPlan" aria-pressed="false">שרטוט מקורי</button>
+    <button id="tElec" class="wide" aria-pressed="true">חשמל: נורות · מפסקים · שקעים</button>
   </div>
   <label for="cut">גובה חיתוך קירות</label>
   <input id="cut" dir="ltr" type="range" min="0.3" max="2.8" step="0.05" value="2.8" />
@@ -576,6 +580,127 @@ f(56, 307, 141, 414, 0, 1.2, MAT.concrete);
 // Laundry: washer
 item('washer', () => f(625, 830, 665, 870, 0, 0.85, MAT.white));
 
+// ---------------------------------------------------------------------------
+// Electrical points from "דירה ההדרים חשמל מעודכן" (sheet rev. 3, 16.11.2026): light points,
+// switches, shutter buttons and sockets only. Positions were read off that sheet and mapped into
+// this plan's pixel frame (±5 cm). Heights: the sheet's H= (cm above the floor; "מהתקרה H=-15" =
+// 15 cm under the ceiling), otherwise 110 for switches and 30 for sockets. Codes like 1A tie a
+// switch to the lights it controls. Light bulbs float in the air at the light point.
+// ---------------------------------------------------------------------------
+// [x, y, height m, code]
+const LIGHTS = [
+  [307, 135, 2.3, '1G'], [439, 136, 2.3, '1G'], [579, 136, 2.3, '1G'], [718, 136, 2.3, '1G'], [886, 135, 2.3, '1G'],
+  [292, 18, 1.2, ''], [683, 13, 1.2, ''], [982, 861, 1.2, ''],   // building's outdoor wall lights
+  [926, 424, 2.4, '1G'], [164, 511, 2.4, '1G'],                  // balcony wall lights, H=240
+  [482, 395, 2.3, ''], [592, 395, 2.3, '1E'], [401, 446, 2.3, '1F'], [777, 437, 2.3, '1D'],
+  [576, 513, 2.3, '1C'], [534, 582, 2.3, '1A'], [577, 532, 2.3, '1A'], [388, 633, 2.3, '1B'], [389, 844, 2.3, '1B'],
+  [196, 643, 2.3, '3A'], [156, 826, 2.3, '3C'], [222, 868, 2.35, '3B'], [260, 1016, 2.3, '3D'],
+  [879, 689, 2.3, '2A'], [796, 617, 2.3, '2B'], [666, 728, 2.35, '2C'], [783, 857, 2.3, '2D'], [932, 855, 2.3, '2D'],
+];
+// [x, y, wall face looks N|S|E|W, the light codes it switches]
+const SWITCHES = [
+  [520, 322, 'S', '1G · 1H · 1M'], [465, 558, 'N', '1F · 1E'], [484, 558, 'N', '1D · 1C'], [500, 558, 'N', '1B'],
+  [73, 673, 'E', '3A'], [265, 745, 'N', '3A'], [417, 793, 'W', '1B'], [272, 826, 'E', '3B · 3C'],
+  [297, 824, 'E', 'דוד'], [285, 901, 'S', '3D'], [166, 1073, 'E', '3D'],
+  [825, 575, 'S', '2A · 2B'], [968, 754, 'W', '2A'], [786, 750, 'E', '2C'], [804, 775, 'E', '2D'],
+];
+// Electric-shutter buttons, next to the shutter motor point of each window: [x, y, face, height m].
+// The first two sit on the peninsula's living-room side, below its 89 cm worktop.
+const SHUTTERS = [[502, 317, 'E', 0.7], [502, 340, 'E', 0.7], [901, 498, 'W'], [901, 381, 'W'], [914, 579, 'S'], [785, 776, 'E'], [275, 538, 'S']];
+// [x, y, face, height m, outlets, kind]: '' regular, 'out' outdoor, 'power' dedicated (כוח), 'ac' air-con
+const SOCKETS = [
+  [52, 245, 'E', 0.3, 2, 'out'], [975, 139, 'W', 0.3, 1, 'power'], [112, 518, 'N', 0.3, 1, 'out'], [136, 511, 'N', 0.3, 1, ''],
+  [122, 538, 'S', 0.4, 1, ''], [144, 538, 'S', 0.4, 1, ''], [161, 538, 'S', 1.2, 1, ''], [55, 672, 'E', 0.6, 1, ''],
+  [335, 742, 'W', 2.65, 1, 'ac'], [300, 524, 'E', 0.3, 1, ''],
+  [788, 557, 'N', 0.4, 1, ''], [802, 557, 'N', 0.4, 1, ''], [817, 557, 'N', 0.4, 1, ''], [886, 557, 'N', 0.4, 1, ''],
+  [923, 477, 'E', 0.3, 1, 'out'], [970, 626, 'W', 0.3, 1, ''], [971, 764, 'W', 0.6, 1, ''], [756, 647, 'E', 0.3, 2, ''],
+  [775, 683, 'N', 2.65, 1, 'ac'], [656, 752, 'E', 1.2, 1, ''], [265, 871, 'E', 2.65, 1, 'ac'], [420, 858, 'W', 0.3, 2, ''],
+  [606, 873, 'E', 0.9, 1, 'power'], [627, 873, 'E', 1.3, 1, 'power'], [782, 831, 'S', 2.4, 1, 'out'],
+  [168, 988, 'E', 0.6, 2, ''], [168, 1009, 'E', 2.4, 1, 'ac'], [168, 1059, 'E', 0.6, 1, ''], [349, 1030, 'W', 1.5, 1, ''],
+];
+
+const electric = new THREE.Group();
+scene.add(electric);
+const EMAT = {   // no cut-plane clipping: the points stay visible above a lowered cut
+  glass: new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xffcf66, emissiveIntensity: 1.5, roughness: 0.15 }),
+  halo: new THREE.MeshBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 0.18, depthWrite: false }),
+  base: new THREE.MeshStandardMaterial({ color: 0xb8b2a6, metalness: 0.7, roughness: 0.3 }),
+  plate: new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.4 }),
+  out: new THREE.MeshStandardMaterial({ color: 0x8f99a3, roughness: 0.5 }),
+  power: new THREE.MeshStandardMaterial({ color: 0xf08a24, roughness: 0.4 }),
+  key: new THREE.MeshStandardMaterial({ color: 0xdfe3e7, roughness: 0.35 }),
+  shutter: new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.4 }),
+  hole: new THREE.MeshStandardMaterial({ color: 0x2b2f33 }),
+};
+function codeLabel(text, cls, at, parent) {
+  const el = document.createElement('div');
+  el.className = `elbl ${cls}`;
+  el.textContent = text;
+  const label = new CSS2DObject(el);
+  label.position.copy(at);
+  parent.add(label);
+}
+
+const bulbs = [];
+const BULB = { glass: new THREE.SphereGeometry(0.055, 24, 16), halo: new THREE.SphereGeometry(0.13, 16, 12),
+  neck: new THREE.CylinderGeometry(0.022, 0.034, 0.05, 20), cap: new THREE.CylinderGeometry(0.022, 0.022, 0.035, 20) };
+LIGHTS.forEach(([x, y, hgt, code], i) => {
+  const b = new THREE.Group();
+  b.add(new THREE.Mesh(BULB.glass, EMAT.glass), new THREE.Mesh(BULB.halo, EMAT.halo));
+  const neck = new THREE.Mesh(BULB.neck, EMAT.glass); neck.position.y = 0.06;
+  const cap = new THREE.Mesh(BULB.cap, EMAT.base); cap.position.y = 0.1;
+  b.add(neck, cap);
+  b.position.set(wx(x), hgt, wz(y));
+  b.userData = { y: hgt, phase: i * 0.9 };
+  if (code) codeLabel(code, 'light', new THREE.Vector3(0, -0.12, 0), b);
+  electric.add(b);
+  bulbs.push(b);
+});
+
+// Wall-mounted plates: a short ray toward the wall finds its face; with no wall in reach
+// (e.g. the kitchen peninsula) the plate stays at the drawn point.
+const FACE = { N: [0, -1, Math.PI], S: [0, 1, 0], E: [1, 0, Math.PI / 2], W: [-1, 0, -Math.PI / 2] };
+const mountRay = new THREE.Raycaster();
+const mountDir = new THREE.Vector3();
+scene.updateMatrixWorld(true);
+function mount(x, y, face, hgt, w, hh, plateMat) {
+  const [fx, fz, rot] = FACE[face];
+  mountDir.set(-fx, 0, -fz);
+  mountRay.set(new THREE.Vector3(wx(x) + fx * 0.35, hgt, wz(y) + fz * 0.35), mountDir);
+  mountRay.far = 0.8;
+  const hit = mountRay.intersectObjects([walls, rails], true).find((h) => h.object.material !== MAT.glass);
+  const g = new THREE.Group();
+  if (hit) g.position.copy(hit.point).addScaledVector(mountDir, -0.002);
+  else g.position.set(wx(x), hgt, wz(y));
+  g.rotation.y = rot;                                  // local +Z looks out of the wall
+  electric.add(g);
+  const add = (geo, m, px, py, pz) => { const o = new THREE.Mesh(geo, m); o.position.set(px, py, pz); g.add(o); return o; };
+  add(new THREE.BoxGeometry(w, hh, 0.01), plateMat, 0, 0, 0.005);
+  return { g, add };
+}
+
+for (const [x, y, face, code] of SWITCHES) {
+  const gangs = code.split('·').length;
+  const { g, add } = mount(x, y, face, 1.1, Math.max(0.085, 0.03 + 0.032 * gangs), 0.085, EMAT.plate);
+  for (let k = 0; k < gangs; k++) add(new THREE.BoxGeometry(0.026, 0.06, 0.008), EMAT.key, (k - (gangs - 1) / 2) * 0.032, 0, 0.012);
+  codeLabel(code, 'sw', new THREE.Vector3(0, 0.1, 0.02), g);
+}
+for (const [x, y, face, hgt = 1.1] of SHUTTERS) {
+  const { add } = mount(x, y, face, hgt, 0.085, 0.085, EMAT.plate);
+  for (const dy of [0.016, -0.016]) add(new THREE.BoxGeometry(0.05, 0.026, 0.008), EMAT.shutter, 0, dy, 0.012);
+}
+const OUTLET = new THREE.CylinderGeometry(0.027, 0.027, 0.006, 24).rotateX(Math.PI / 2);
+const PIN = new THREE.CylinderGeometry(0.0035, 0.0035, 0.003, 8).rotateX(Math.PI / 2);
+for (const [x, y, face, hgt, n, kind] of SOCKETS) {
+  const plateMat = kind === 'power' ? EMAT.power : kind === 'out' ? EMAT.out : EMAT.plate;
+  const { add } = mount(x, y, face, hgt, 0.085 * n, 0.085, plateMat);
+  for (let k = 0; k < n; k++) {
+    const cx = (k - (n - 1) / 2) * 0.085;
+    add(OUTLET, EMAT.key, cx, 0, 0.012);
+    for (const [px, py] of [[-0.009, 0.006], [0.009, 0.006], [0, -0.01]]) add(PIN, EMAT.hole, cx + px, py, 0.0155);  // Israeli type H
+  }
+}
+
 // Concrete pergola over the sun balcony
 const pergola = new THREE.Group();
 scene.add(pergola);
@@ -740,6 +865,7 @@ toggle('tLabels', (on) => document.getElementById('labels').classList.toggle('hi
 toggle('tPergola', (on) => { pergola.visible = on; });
 toggle('tFurniture', (on) => { furniture.visible = on; });
 toggle('tPlan', (on) => { plan.visible = on; });
+toggle('tElec', (on) => { electric.visible = on; });
 
 // ---------------------------------------------------------------------------
 // Moving furniture: drag a piece across the floor, then save — written into the
@@ -914,6 +1040,10 @@ const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);
   if (walking) walkStep(dt);
+  if (electric.visible) {          // bulbs hover gently in place
+    const t = clock.elapsedTime;
+    for (const b of bulbs) b.position.y = b.userData.y + 0.025 * Math.sin(t * 1.6 + b.userData.phase);
+  }
   else controls.update();
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
