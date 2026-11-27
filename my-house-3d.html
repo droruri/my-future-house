@@ -58,6 +58,34 @@
   #planBar button { font: inherit; font-size: 14px; min-width: 36px; padding: 7px 10px; border-radius: 8px; cursor: pointer; border: 1px solid #cbd5e1; background: #fff; color: #0f172a; box-shadow: 0 2px 8px rgba(15,23,42,0.12); }
   #planBar button:hover { border-color: #3b82f6; }
   #planHint { position: absolute; bottom: 12px; left: 50%; translate: -50% 0; direction: rtl; font-size: 12px; color: #475569; background: rgba(255,255,255,0.9); padding: 4px 10px; border-radius: 8px; }
+  /* Mobile: the panel folds behind a menu button; touch devices get an on-screen walk pad */
+  #menuBtn, #pad, .touchHint { display: none; }
+  #menuBtn, #pad button {
+    font: inherit; font-size: 20px; width: 48px; height: 48px; border-radius: 12px; cursor: pointer;
+    border: 1px solid #cbd5e1; background: rgba(255,255,255,0.92); color: #0f172a;
+    box-shadow: 0 4px 12px rgba(15,23,42,0.15); touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  #pad { position: fixed; bottom: calc(16px + env(safe-area-inset-bottom)); left: 16px; grid-template-columns: repeat(3, 48px); gap: 6px; direction: ltr; }
+  #pad .up { grid-area: 1 / 2; } #pad .left { grid-area: 2 / 1; } #pad .down { grid-area: 2 / 2; } #pad .right { grid-area: 2 / 3; }
+  #pad .exit { grid-area: 1 / 3; font-size: 16px; }
+  #pad button:active { background: #2563eb; color: #fff; }
+  @media (pointer: coarse) {
+    #viewWalk { display: none; }
+    #panel .group button:has(+ #viewWalk) { grid-column: 1 / -1; }
+    body.walking #pad { display: grid; }
+    #panel .hint { display: none; }
+    #panel .touchHint { display: block; }
+  }
+  @media (max-width: 700px) {
+    #menuBtn { display: block; position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 10px; z-index: 2; }
+    #panel {
+      top: calc(64px + env(safe-area-inset-top)); right: 10px; left: 10px; width: auto;
+      max-height: calc(100dvh - 80px - env(safe-area-inset-top)); overflow-y: auto; display: none;
+    }
+    #panel.open { display: block; }
+    #panel button { padding: 10px 6px; font-size: 14px; }
+    #panel input[type=range] { height: 32px; }
+  }
 </style>
 <script type="importmap">
 { "imports": {
@@ -69,6 +97,14 @@
 <body>
 <div id="app"></div>
 <div id="labels"></div>
+<button id="menuBtn" aria-label="תפריט" aria-controls="panel" aria-expanded="false">☰</button>
+<div id="pad" aria-label="תנועה">
+  <button class="up" data-key="ArrowUp" aria-label="קדימה">▲</button>
+  <button class="left" data-key="ArrowLeft" aria-label="שמאלה">◀</button>
+  <button class="down" data-key="ArrowDown" aria-label="אחורה">▼</button>
+  <button class="right" data-key="ArrowRight" aria-label="ימינה">▶</button>
+  <button class="exit" id="padExit" aria-label="יציאה מההליכה">✕</button>
+</div>
 <div id="panel">
   <h1>דירה 25 · קומה 7</h1>
   <div class="sub" id="area"></div>
@@ -100,6 +136,7 @@
   </div>
   <div id="saveStatus" role="status"></div>
   <div class="hint">גרירת רהיט — הזזה (ואז שמירה) · גרירה — סיבוב · גלגלת — זום לכיוון העכבר · לחצן ימני — הזזה · לחיצה על הרצפה — כניסה לשם · לחיצה כפולה — מרכז סיבוב<br />P — שרטוט במסך מלא (גם בהליכה)<br />הצבע ולך: גרירה — מבט · לחיצה על הרצפה — מעבר לשם · WASD / חצים — תנועה · גלגלת — זום · Shift — מהר · Esc — יציאה<br />הליכה (עכבר נעול): העכבר מסובב את המבט · Esc — חזרה להצבע ולך<br />המידות משוערות מתוך השרטוט (קנה מידה ≈ 1.44 ס"מ לפיקסל).</div>
+  <div class="hint touchHint">גרירה באצבע — סיבוב · צביטה — זום · שתי אצבעות — הזזה · הקשה על הרצפה — כניסה לשם · גרירת רהיט — הזזה<br />הצבע ולך: גרירה — מבט · הקשה על הרצפה — מעבר לשם · חצים בפינה — תנועה · ✕ — יציאה<br />המידות משוערות מתוך השרטוט (קנה מידה ≈ 1.44 ס"מ לפיקסל).</div>
 </div>
 
 <dialog id="planDlg" aria-label="שרטוט מקורי">
@@ -1367,6 +1404,7 @@ function enterWalk(at, lookAt) {
   dims.position.y = 0;
   document.getElementById('cut').value = '2.8';
   document.getElementById('labels').classList.add('walking');
+  document.body.classList.add('walking');
   pressView(walk.isLocked ? 'viewWalk' : 'viewGo');
 }
 function exitWalk() {
@@ -1375,6 +1413,7 @@ function exitWalk() {
   keys.clear();
   if (walk.isLocked) walk.unlock();
   document.getElementById('labels').classList.remove('walking');
+  document.body.classList.remove('walking');
 }
 function enterLivingRoom() {          // living room, looking toward the kitchen
   if (!walking) enterWalk(new THREE.Vector3(wx(640), EYE, wz(470)), new THREE.Vector3(wx(400), EYE, wz(430)));
@@ -1421,24 +1460,31 @@ window.addEventListener('keydown', (e) => {
 });
 
 // A press that moves more than 3 px is a drag (look, orbit, move furniture), not a click.
-const press = { x: 0, y: 0, moved: false };
+// Deltas come from the last position, not movementX/Y, which touch pointers may not report.
+const press = { x: 0, y: 0, lastX: 0, lastY: 0, moved: false };
 const look = new THREE.Euler(0, 0, 0, 'YXZ');
 renderer.domElement.addEventListener('pointerdown', (e) => {
-  Object.assign(press, { x: e.clientX, y: e.clientY, moved: false });
+  if (!e.isPrimary) return;
+  Object.assign(press, { x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, moved: false });
   marker.visible = false;
 });
 renderer.domElement.addEventListener('pointermove', (e) => {
+  if (!e.isPrimary) return;
+  const dx = e.clientX - press.lastX, dy = e.clientY - press.lastY;
+  press.lastX = e.clientX; press.lastY = e.clientY;
   if (e.buttons && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 3) press.moved = true;
   if (flight || drag || walk.isLocked) return;
-  if (e.buttons) {                      // drag the view: 0.0013 rad/px, pitch within ±60°
+  if (e.buttons) {                      // drag the view: 0.0013 rad/px (touch: 0.004), pitch within ±60°
     if (walking && e.buttons === 1 && press.moved) {
+      const k = e.pointerType === 'touch' ? 0.004 : 0.0013;
       look.setFromQuaternion(camera.quaternion);
-      look.y += e.movementX * 0.0013;
-      look.x = THREE.MathUtils.clamp(look.x + e.movementY * 0.0013, -Math.PI / 3, Math.PI / 3);
+      look.y += dx * k;
+      look.x = THREE.MathUtils.clamp(look.x + dy * k, -Math.PI / 3, Math.PI / 3);
       camera.quaternion.setFromEuler(look);
     }
     return;
   }
+  if (e.pointerType === 'touch') return;  // no hover disc for fingers
   const at = floorAt(e);
   marker.visible = at !== null;
   if (!at) return;
@@ -1509,6 +1555,32 @@ toggle('tFurniture', (on) => { furniture.visible = on; });
 toggle('tPlan', (on) => { plan.visible = on; });
 toggle('tElec', (on) => { electric.visible = on; });
 toggle('tDims', (on) => { dims.visible = on; });
+
+// Mobile menu: the panel folds behind ☰ on narrow screens; picking a view folds it again.
+const panelEl = document.getElementById('panel');
+const menuBtn = document.getElementById('menuBtn');
+function setMenu(open) {
+  panelEl.classList.toggle('open', open);
+  menuBtn.setAttribute('aria-expanded', String(open));
+  menuBtn.textContent = open ? '✕' : '☰';
+}
+menuBtn.onclick = () => setMenu(!panelEl.classList.contains('open'));
+for (const id of ['view3d', 'viewTop', 'viewGo', 'openPlan']) {
+  document.getElementById(id).addEventListener('click', () => setMenu(false));
+}
+
+// Touch walk pad: holding an arrow is holding that key; ✕ steps back outside like Esc.
+for (const btn of document.querySelectorAll('#pad [data-key]')) {
+  const code = btn.dataset.key;
+  if (!code) continue;
+  const up = () => keys.delete(code);
+  btn.addEventListener('pointerdown', (e) => { e.preventDefault(); keys.add(code); });
+  btn.addEventListener('pointerup', up);
+  btn.addEventListener('pointercancel', up);
+  btn.addEventListener('pointerleave', up);   // touch pointers are captured to the button implicitly
+  btn.addEventListener('contextmenu', (e) => e.preventDefault());   // long-press menu
+}
+document.getElementById('padExit').onclick = () => { if (walking && !flight) leaveWalk(); };
 
 // ---------------------------------------------------------------------------
 // Full-screen sketch viewer, from any view (P key or button). The image is drawn at
