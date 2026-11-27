@@ -75,7 +75,8 @@
   <div class="group">
     <button id="view3d">תלת-ממד</button>
     <button id="viewTop">מבט על</button>
-    <button id="viewWalk" class="wide">הליכה בתוך הבית</button>
+    <button id="viewGo">הצבע ולך</button>
+    <button id="viewWalk">הליכה (עכבר נעול)</button>
   </div>
   <div class="group">
     <button id="tLabels" aria-pressed="true">שמות חדרים</button>
@@ -98,7 +99,7 @@
     </div>
   </div>
   <div id="saveStatus" role="status"></div>
-  <div class="hint">גרירת רהיט — הזזה (ואז שמירה) · גרירה — סיבוב · גלגלת — זום לכיוון העכבר · לחצן ימני — הזזה · לחיצה כפולה — מרכז סיבוב<br />P — שרטוט במסך מלא (גם בהליכה)<br />הליכה: עכבר — מבט · WASD / חצים — תנועה · גלגלת — זום · Shift — מהר · Esc — יציאה<br />המידות משוערות מתוך השרטוט (קנה מידה ≈ 1.44 ס"מ לפיקסל).</div>
+  <div class="hint">גרירת רהיט — הזזה (ואז שמירה) · גרירה — סיבוב · גלגלת — זום לכיוון העכבר · לחצן ימני — הזזה · לחיצה על הרצפה — כניסה לשם · לחיצה כפולה — מרכז סיבוב<br />P — שרטוט במסך מלא (גם בהליכה)<br />הצבע ולך: גרירה — מבט · לחיצה על הרצפה — מעבר לשם · WASD / חצים — תנועה · גלגלת — זום · Shift — מהר · Esc — יציאה<br />הליכה (עכבר נעול): העכבר מסובב את המבט · Esc — חזרה להצבע ולך<br />המידות משוערות מתוך השרטוט (קנה מידה ≈ 1.44 ס"מ לפיקסל).</div>
 </div>
 
 <dialog id="planDlg" aria-label="שרטוט מקורי">
@@ -116,7 +117,7 @@
 
 <!-- Approved furniture moves: item id → offset (m) from where the code draws it. Written by the
      "שמירה" button; edit or reset to {} by hand if needed. -->
-<script type="application/json" id="layout">{"dining":{"x":-14.38,"z":-8.61},"sofa":{"x":-19.85,"z":-5.06},"figure":{"x":-2.96,"z":1.54},"bed3":{"x":11.02,"z":0.34},"novaShelf":{"x":-662.18,"z":30.99},"jacuzzi":{"x":-0.07,"z":0.02},"balconyTable":{"x":-8,"z":-5.5},"balconyTable2":{"x":4.51,"z":-0.18},"grillTable":{"x":0.04,"z":0.97}}</script>
+<script type="application/json" id="layout">{"rug":{"x":-10.76,"z":0.83},"dining":{"x":-14.38,"z":-8.61},"sofa":{"x":-19.85,"z":-5.06},"figure":{"x":-2.96,"z":1.54},"bed3":{"x":11.02,"z":0.34},"novaShelf":{"x":-662.18,"z":30.99},"jacuzzi":{"x":-0.07,"z":0.02},"balconyTable":{"x":-8,"z":-5.5},"balconyTable2":{"x":4.51,"z":-0.18},"hermitageSet":{"x":0.16,"z":-0.39},"grillTable":{"x":0.04,"z":0.97},"swing":{"x":0.03,"z":-0.41}}</script>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -183,10 +184,10 @@ const MAT = {
   mamad: mat(0xd9d3c7, { side: THREE.DoubleSide }),
   glass: new THREE.MeshStandardMaterial({ color: 0x9fd3ff, transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0.1, clippingPlanes: [cutPlane], depthWrite: false }),
   rail: new THREE.MeshStandardMaterial({ color: 0xbfe3ff, transparent: true, opacity: 0.3, roughness: 0.05, depthWrite: false }),
-  wood: mat(0xc9a27a), tile: mat(0xe7e3dc), wet: mat(0xcfd8dc), lobby: mat(0xb7bcc2),
+  wet: mat(0xcfd8dc), lobby: mat(0xb7bcc2),
   deck: mat(0xd8cfc2), slab: mat(0x9aa3ad),
   steel: mat(0xb9bec4, { metalness: 0.6, roughness: 0.35 }), appliance: mat(0x1c1f22, { roughness: 0.2 }),
-  white: mat(0xffffff), counter: mat(0xa87b4f, { roughness: 0.6 }), cabinet: mat(0xefece6), fabric: mat(0x7d8b99),
+  white: mat(0xffffff), counter: mat(0xe6d8bf, { roughness: 0.3 }), cabinet: mat(0xefece6), kitchenWood: mat(0xd9bc93, { roughness: 0.7 }), fabric: mat(0x7d8b99),
   bed: mat(0xf3efe7), pillow: mat(0xffffff), darkwood: mat(0x6b4f3a), rug: mat(0xb9a58f),
   water: mat(0x4fb3d9, { roughness: 0.1, metalness: 0.2 }),
   concrete: mat(0xc6c2bb),
@@ -194,11 +195,11 @@ const MAT = {
   ovenGlass: mat(0x3b4148, { roughness: 0.08, metalness: 0.3 }), burner: mat(0x9aa1a8, { metalness: 0.5, roughness: 0.4 }),
   led: mat(0xffffff, { emissive: 0xfff2d0, emissiveIntensity: 1.6 }),
   balconyTile: mat(0xffffff, { map: woodPlankTexture() }),
+  floorTile: mat(0xffffff, { map: concreteTileTexture(), roughness: 0.55 }),
 };
 
 // Inbal "Blaze Roble" 30×150 cm wood-look porcelain (light natural oak, matte R10).
-// Canvas covers 3.0 × 1.5 m = 2 planks × 5 rows, staggered by half a plank; floor UVs are
-// world metres (ExtrudeGeometry top face), so repeat = 1 / tile size.
+// Canvas covers 3.0 × 1.5 m = 2 planks × 5 rows, staggered by half a plank.
 function woodPlankTexture() {
   const PX_PER_M = 400, TW = 3.0, TH = 1.5, PL = 1.5, PW = 0.3;
   const c = document.createElement('canvas');
@@ -236,10 +237,55 @@ function woodPlankTexture() {
       g.strokeRect(x, y, pl, pw);
     }
   }
-  const tex = new THREE.CanvasTexture(c);
+  return worldTexture(c, TW, TH);
+}
+
+// Negev "Magma Bone" 100×100 cm concrete-look porcelain (light warm grey, satin, shade V3).
+// Canvas covers 2 × 2 m = 4 tiles, each with its own shade and cloudy mottling.
+function concreteTileTexture() {
+  const PX_PER_M = 400, N = 2, S = PX_PER_M;
+  const c = document.createElement('canvas');
+  c.width = c.height = N * S;
+  const g = c.getContext('2d');
+  let seed = 11;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const tones = [[208, 203, 194], [200, 195, 186], [214, 209, 201], [204, 198, 188]];
+  for (let ty = 0; ty < N; ty++) for (let tx = 0; tx < N; tx++) {
+    const x = tx * S, y = ty * S;
+    const [r, gr, b] = tones[(tx + ty * N) % tones.length];
+    g.save();
+    g.beginPath(); g.rect(x, y, S, S); g.clip();
+    g.fillStyle = `rgb(${r},${gr},${b})`;
+    g.fillRect(x, y, S, S);
+    for (let i = 0; i < 90; i++) {                   // soft light/dark clouds
+      const cx = x + rnd() * S, cy = y + rnd() * S, rad = 20 + rnd() * 120;
+      const d = rnd() < 0.5 ? -22 : 16;
+      const grad = g.createRadialGradient(cx, cy, 0, cx, cy, rad);
+      grad.addColorStop(0, `rgba(${r + d},${gr + d},${b + d},${0.12 + rnd() * 0.15})`);
+      grad.addColorStop(1, `rgba(${r + d},${gr + d},${b + d},0)`);
+      g.fillStyle = grad;
+      g.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
+    }
+    for (let i = 0; i < 1500; i++) {                 // fine speckle
+      const d = rnd() < 0.5 ? -50 : 30;
+      g.fillStyle = `rgba(${r + d},${gr + d},${b + d},0.25)`;
+      g.fillRect(x + rnd() * S, y + rnd() * S, 1 + rnd() * 1.5, 1 + rnd() * 1.5);
+    }
+    g.restore();
+    g.strokeStyle = 'rgba(150,145,138,0.8)';     // 2 mm grout joint
+    g.lineWidth = 2;
+    g.strokeRect(x, y, S, S);
+  }
+  return worldTexture(c, N, N);
+}
+
+// Floor UVs are world metres (ExtrudeGeometry top face), so a canvas covering w × h metres
+// repeats every w × h.
+function worldTexture(canvas, w, h) {
+  const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(1 / TW, 1 / TH);
+  tex.repeat.set(1 / w, 1 / h);
   tex.anisotropy = 8;
   return tex;
 }
@@ -389,15 +435,15 @@ box(440, 578, 530, 700, 0, H, MAT.core, walls);
 // ---------------------------------------------------------------------------
 const rect = (x1, y1, x2, y2) => [[x1, y1], [x2, y1], [x2, y2], [x1, y2]];
 const rooms = [
-  { name: 'מטבח', poly: [[283, 303], [505, 303], [505, 572], [345, 572], [345, 553], [283, 553]], mat: MAT.wood, at: [400, 420] },
-  { name: 'חדר דיור', poly: rect(505, 303, 910, 572), mat: MAT.wood, at: [700, 420] },
-  { name: 'חדר שינה 3', poly: [[48, 543], [283, 543], [283, 553], [345, 553], [345, 765], [48, 765]], mat: MAT.wood, at: [190, 680] },
-  { name: 'מסדרון', poly: [[345, 572], [430, 572], [430, 893], [278, 893], [278, 765], [345, 765]], mat: MAT.tile, at: [388, 740] },
+  { name: 'מטבח', poly: [[283, 303], [505, 303], [505, 572], [345, 572], [345, 553], [283, 553]], mat: MAT.floorTile, at: [400, 420] },
+  { name: 'חדר דיור', poly: rect(505, 303, 910, 572), mat: MAT.floorTile, at: [700, 420] },
+  { name: 'חדר שינה 3', poly: [[48, 543], [283, 543], [283, 553], [345, 553], [345, 765], [48, 765]], mat: MAT.floorTile, at: [190, 680] },
+  { name: 'מסדרון', poly: [[345, 572], [430, 572], [430, 893], [278, 893], [278, 765], [345, 765]], mat: MAT.floorTile, at: [388, 740] },
   { name: 'חדר רחצה', poly: rect(48, 765, 278, 893), mat: MAT.wet },
-  { name: 'ממ"ד / חדר שינה 2', poly: rect(152, 893, 372, 1148), mat: MAT.wood },
-  { name: 'מבואה', poly: rect(652, 572, 735, 641), mat: MAT.tile, noArea: true },
+  { name: 'ממ"ד / חדר שינה 2', poly: rect(152, 893, 372, 1148), mat: MAT.floorTile },
+  { name: 'מבואה', poly: rect(652, 572, 735, 641), mat: MAT.floorTile, noArea: true },
   { name: 'רחצה הורים', poly: [[652, 641], [749, 641], [749, 698], [780, 698], [780, 818], [652, 818]], mat: MAT.wet, at: [705, 750] },
-  { name: 'חדר שינה הורים', poly: [[735, 572], [975, 572], [975, 792], [780, 792], [780, 698], [749, 698], [749, 641], [735, 641]], mat: MAT.wood, at: [880, 700] },
+  { name: 'חדר שינה הורים', poly: [[735, 572], [975, 572], [975, 792], [780, 792], [780, 698], [749, 698], [749, 641], [735, 641]], mat: MAT.floorTile, at: [880, 700] },
   { name: 'לובי קומה 7', poly: rect(430, 572, 600, 1060), mat: MAT.lobby, kind: 'common', at: [515, 820] },
   { name: 'מרפסת שמש', poly: [[40, 25], [982, 25], [982, 286], [1018, 286], [1018, 572], [910, 572], [910, 303], [283, 303], [283, 543], [40, 543]], mat: MAT.balconyTile, kind: 'outside', at: [600, 200] },
   { name: 'מרפסת + כביסה', poly: [[600, 818], [784, 818], [784, 792], [985, 792], [985, 893], [600, 893]], mat: MAT.balconyTile, kind: 'outside', at: [830, 850] },
@@ -500,7 +546,7 @@ function onFace(axis, at, out, d0, d1, a1, a2, h0, h1, m) {
 // through the reveal, so each door and drawer reads as its own panel.
 // handle: 'top' | 'bottom' (horizontal bar) | 'side1' | 'side2' (vertical bar at a1 / a2).
 const FT = 1.9, REVEAL = 0.5;
-function front(axis, at, out, a1, a2, h0, h1, handle, m = MAT.cabinet) {
+function front(axis, at, out, a1, a2, h0, h1, handle, m = MAT.kitchenWood) {
   const r = REVEAL / 2;
   onFace(axis, at, out, -0.3, 0.05, a1, a2, h0, h1, MAT.reveal);
   onFace(axis, at, out, 0.05, FT, a1 + r, a2 - r, h0 + r, h1 - r, m);
@@ -522,16 +568,16 @@ const DRAWERS = [PLINTH, 49.25, 68.25, BASE];   // 37 / 19 / 19.5 fronts, bottom
 // West wall, north → south: blind corner 67 + door 61 (lift-ups and top cabinets above)
 // | oven tower 60 | pantry 60 | fridge 95 = 343. Carcass face 56.2, 58.1 with fronts.
 const W = 56.2;
-k(0, 0, W, 128, PLINTH, BASE, MAT.cabinet);
-k(0, 128, W, 248, PLINTH, TALL, MAT.cabinet);
-k(0, 0, W, 128, NICHE, TALL, MAT.cabinet);
-k(0, 248, W, 343, NICHE, TALL, MAT.cabinet);
+k(0, 0, W, 128, PLINTH, BASE, MAT.kitchenWood);
+k(0, 128, W, 248, PLINTH, TALL, MAT.kitchenWood);
+k(0, 0, W, 128, NICHE, TALL, MAT.kitchenWood);
+k(0, 248, W, 343, NICHE, TALL, MAT.kitchenWood);
 k(0, 0, W - 5, 248, 0, PLINTH, MAT.plinth);
 k(0, 0, 62, 128, BASE, TOP, MAT.counter);
 front('e', W, 1, 58.1, 67, PLINTH, BASE);              // corner filler
 front('e', W, 1, 67, 128, PLINTH, BASE, 'side1');      // door, 2 high inner pull-outs
 // Lift-ups ("קלפה HK") 39.8 high, 58 above the worktop, LED strip underneath
-k(0, 0, 33.1, 128, 147.2, NICHE, MAT.cabinet);
+k(0, 0, 33.1, 128, 147.2, NICHE, MAT.kitchenWood);
 front('e', 33.1, 1, 0, 64, 147.2, NICHE, 'bottom');
 front('e', 33.1, 1, 64, 128, 147.2, NICHE, 'bottom');
 k(27, 1, 31, 127, 146.9, 147.2, MAT.led);
@@ -564,9 +610,9 @@ for (const s of [300, 308]) onFace('e', 57.8, 1, 5.3, 7.3, s - 0.8, s + 0.8, 50,
 
 // Window wall, west → east: blind corner | integrated dishwasher 60 | sink 61 | bottle pull-out 30
 const N = 56.2;
-k(0, 0, 130, N, PLINTH, BASE, MAT.cabinet);
-k(130, 0, 191, N, PLINTH, 65, MAT.cabinet);           // lower under the sink bowl
-k(191, 0, 221, N, PLINTH, BASE, MAT.cabinet);
+k(0, 0, 130, N, PLINTH, BASE, MAT.kitchenWood);
+k(130, 0, 191, N, PLINTH, 65, MAT.kitchenWood);           // lower under the sink bowl
+k(191, 0, 221, N, PLINTH, BASE, MAT.kitchenWood);
 k(0, 0, 221, N - 5, 0, PLINTH, MAT.plinth);
 front('s', N, 1, 58.1, 70, PLINTH, BASE);
 front('s', N, 1, 70, 130, PLINTH, BASE, 'top');
@@ -590,13 +636,13 @@ kCyl(160.5, 21.8, 1.2, TOP + 24, TOP + 30, MAT.steel);
 // the worktop for two bar stools.
 const PK = 222.9, PL = 303.4;                         // kitchen / living carcass faces
 const BAR_S = 147, BAR_E = 305.3 - 30;                // recess: s 0..147, back face 30 behind the worktop edge
-k(PK, 0, BAR_E, BAR_S, PLINTH, BASE, MAT.cabinet);
-k(BAR_E - 1.9, 0, BAR_E, BAR_S, 0, PLINTH, MAT.cabinet);   // recess back runs to the floor
+k(PK, 0, BAR_E, BAR_S, PLINTH, BASE, MAT.kitchenWood);
+k(BAR_E - 1.9, 0, BAR_E, BAR_S, 0, PLINTH, MAT.kitchenWood);   // recess back runs to the floor
 k(PK + 5, 0, BAR_E - 1.9, BAR_S, 0, PLINTH, MAT.plinth);
-k(PK, BAR_S, PL, 232, PLINTH, BASE, MAT.cabinet);
+k(PK, BAR_S, PL, 232, PLINTH, BASE, MAT.kitchenWood);
 k(PK + 5, BAR_S, PL - 5, 232, 0, PLINTH, MAT.plinth);
-k(BAR_E, BAR_S - 1.9, 305.3, BAR_S, 0, BASE, MAT.cabinet);   // side panel closing the doors
-k(221, 232, 305.3, 234, 0, BASE, MAT.cabinet);        // end panel
+k(BAR_E, BAR_S - 1.9, 305.3, BAR_S, 0, BASE, MAT.kitchenWood);   // side panel closing the doors
+k(221, 232, 305.3, 234, 0, BASE, MAT.kitchenWood);        // end panel
 k(221, 0, 305.3, 234, BASE, TOP, MAT.counter);
 front('e', PK, -1, 0, 62, PLINTH, BASE);               // blind, next to the bottle pull-out
 for (const [a1, a2] of [[62, 147], [147, 232]]) {
@@ -1198,19 +1244,69 @@ scene.add(ground);
 // UI
 // ---------------------------------------------------------------------------
 function pressView(id) {
-  for (const b of ['view3d', 'viewTop', 'viewWalk']) {
+  for (const b of ['view3d', 'viewTop', 'viewGo', 'viewWalk']) {
     document.getElementById(b).setAttribute('aria-pressed', String(b === id));
   }
 }
-function setView(top) {
-  if (top) camera.position.set(0, 21, 0.01);
-  else camera.position.set(7, 11, 13);
-  controls.target.set(0, 0, 0);
-  controls.update();
-  pressView(top ? 'viewTop' : 'view3d');
+
+// ---------------------------------------------------------------------------
+// Navigation, after vr-interior.oaksun.studio. Three modes:
+//  - Orbit (3D / top view): OrbitControls. A disc follows the mouse over the floor; a click
+//    there flies you inside, to eye height just short of the disc, facing the way you looked.
+//  - Point and go (inside): drag to look, click the floor to glide there, keys walk.
+//  - Locked walk: the same, with the mouse captured (pointer lock) for looking.
+// Esc steps back one mode. Every change of place is a ~1 s flight: the eye eases out
+// cubically, the gaze eases out exponentially so it settles before the eye arrives.
+// ---------------------------------------------------------------------------
+const EYE = 1.65;                     // eye height (m)
+// Lenses (vertical field of view) as on that site: 45° outside, 75° inside (about what a
+// person takes in), 90° in the locked walk.
+const ORBIT_FOV = 45, WALK_FOV = 75, LOCKED_FOV = 90;
+const FLY_MS = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1000;
+const ORIGIN = new THREE.Vector3();
+let walking = false;
+let flight = null;                    // { from, to, gazeFrom, gazeTo, fovFrom, fovTo, t0, ms, done }
+const gaze = new THREE.Vector3();
+const facing = new THREE.Vector3();
+
+function heading() {                  // horizontal unit vector the camera looks along
+  camera.getWorldDirection(facing).setY(0);
+  if (facing.lengthSq() < 1e-6) facing.set(0, 0, -1);
+  return facing.normalize();
 }
-document.getElementById('view3d').onclick = () => { exitWalk(); setView(false); };
-document.getElementById('viewTop').onclick = () => { exitWalk(); setView(true); };
+// Start a flight. Call it before switching `walking`: the gaze starts where the camera looks
+// now (the orbit centre outside, 2 m ahead inside). gazeTo = null keeps the look direction.
+function fly(to, gazeTo, fov, done, ms = FLY_MS) {
+  camera.getWorldDirection(gaze).multiplyScalar(walking ? 2 : camera.position.distanceTo(controls.target)).add(camera.position);
+  flight = { from: camera.position.clone(), to, gazeFrom: gaze.clone(), gazeTo, fovFrom: camera.fov, fovTo: fov, t0: performance.now(), ms: FLY_MS && ms, done };
+  controls.enabled = false;
+  marker.visible = false;
+}
+function flightStep(now) {
+  const f = flight;
+  const t = f.ms ? Math.min((now - f.t0) / f.ms, 1) : 1;
+  const ease = 1 - (1 - t) ** 3;
+  camera.position.lerpVectors(f.from, f.to, ease);
+  if (f.gazeTo) camera.lookAt(gaze.lerpVectors(f.gazeFrom, f.gazeTo, t === 1 ? 1 : 1 - 2 ** (-10 * t)));
+  camera.fov = f.fovFrom + (f.fovTo - f.fovFrom) * ease;
+  camera.updateProjectionMatrix();
+  if (t === 1) { flight = null; f.done?.(); }
+}
+
+function toOrbit(position, id) {
+  const target = ORIGIN.clone();
+  fly(position, target, ORBIT_FOV, () => { controls.target.copy(target); controls.enabled = true; controls.update(); });
+  exitWalk();
+  pressView(id);
+}
+function setView(top) {
+  toOrbit(top ? new THREE.Vector3(0, 21, 0.01) : new THREE.Vector3(7, 11, 13), top ? 'viewTop' : 'view3d');
+}
+function leaveWalk() {                // back outside, behind the house as you were facing
+  toOrbit(heading().multiplyScalar(-13).setY(13), 'view3d');
+}
+document.getElementById('view3d').onclick = () => setView(false);
+document.getElementById('viewTop').onclick = () => setView(true);
 
 // Outside: double-click a surface to orbit around that point.
 const pick = new THREE.Raycaster();
@@ -1219,19 +1315,43 @@ function rayAt(e) {                   // aim `pick` through the mouse position
   pointer.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
   pick.setFromCamera(pointer, camera);
 }
+let goTimer = 0;                      // a single click on the floor waits out a possible double click
 renderer.domElement.addEventListener('dblclick', (e) => {
-  if (walking) return;
+  clearTimeout(goTimer);
+  if (walking || flight) return;
   rayAt(e);
   const hit = pick.intersectObjects([walls, rails, furniture, plan], true)[0];
   if (hit) { controls.target.copy(hit.point); controls.update(); }
 });
 
+// The floor point under the mouse you could stand on, or null: the first surface actually
+// seen (shown, not cut away, not see-through like glass, balcony rails or the sketch overlay)
+// must face up and sit at floor level: rooms at 0, balconies 4 cm lower, a rug 1 cm up
+// (not a seat or a table, not the ground far below).
+const shown = (o) => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
+const normalMatrix = new THREE.Matrix3();
+const normal = new THREE.Vector3();
+function floorAt(e) {
+  rayAt(e);
+  const hit = pick.intersectObjects(scene.children, true).find((h) => h.point.y <= cutPlane.constant && shown(h.object) && !h.object.material.transparent);
+  if (!hit?.face || hit.point.y < -0.1 || hit.point.y > 0.05) return null;
+  normal.copy(hit.face.normal).applyMatrix3(normalMatrix.getNormalMatrix(hit.object.matrixWorld)).normalize();
+  return normal.y > 0.7 ? hit.point : null;
+}
+const marker = new THREE.Mesh(
+  new THREE.CircleGeometry(0.15, 32),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false }),
+);
+marker.rotation.x = -Math.PI / 2;
+marker.raycast = () => {};            // never picked itself
+marker.visible = false;
+scene.add(marker);
+
 // ---------------------------------------------------------------------------
-// Walk mode: first person at eye height, keys move. Mouse looks around: captured
-// (pointer lock) when the browser allows it, otherwise by dragging.
-// Walls, glass, balcony rails and (when shown) furniture block movement.
+// Inside: first person at eye height, keys move. Mouse looks around by dragging, or
+// captured (pointer lock) in the locked walk.
+// Walls, glass, balcony rails and (when shown) furniture block key movement.
 // ---------------------------------------------------------------------------
-const EYE = 1.65;                     // eye height (m)
 const BODY = 0.25;                    // how close you can get to a wall (m)
 const walk = new PointerLockControls(camera, document.body);
 const keys = new Set();
@@ -1240,20 +1360,14 @@ window.addEventListener('keyup', (e) => keys.delete(e.code));
 window.addEventListener('blur', () => keys.clear());
 
 const planDlg = document.getElementById('planDlg');  // full-screen sketch viewer (below)
-let walking = false;
-function enterWalk() {
+function enterWalk(at, lookAt) {
+  fly(at, lookAt, WALK_FOV);
   walking = true;
-  controls.enabled = false;
   cutPlane.constant = H + 0.1;          // full-height walls while inside
   dims.position.y = 0;
   document.getElementById('cut').value = '2.8';
-  camera.position.set(wx(640), EYE, wz(470));  // living room, looking toward the kitchen
-  camera.lookAt(wx(400), EYE, wz(430));
   document.getElementById('labels').classList.add('walking');
-  camera.fov = 70;                      // wider lens indoors
-  camera.updateProjectionMatrix();
-  pressView('viewWalk');
-  walk.lock();                          // needs a user gesture; may be refused (then drag to look)
+  pressView(walk.isLocked ? 'viewWalk' : 'viewGo');
 }
 function exitWalk() {
   if (!walking) return;
@@ -1261,30 +1375,84 @@ function exitWalk() {
   keys.clear();
   if (walk.isLocked) walk.unlock();
   document.getElementById('labels').classList.remove('walking');
-  camera.fov = 45;
-  camera.updateProjectionMatrix();
-  controls.enabled = true;
 }
-document.getElementById('viewWalk').onclick = enterWalk;
-walk.addEventListener('unlock', () => { if (walking && !planDlg.open) { exitWalk(); setView(false); } });  // Esc while captured
+function enterLivingRoom() {          // living room, looking toward the kitchen
+  if (!walking) enterWalk(new THREE.Vector3(wx(640), EYE, wz(470)), new THREE.Vector3(wx(400), EYE, wz(430)));
+}
+// Outside, a floor click lands 0.8 m short of the disc looking ahead; inside it glides there.
+function goTo(at) {
+  if (!walking) {
+    const ahead = heading();
+    const stand = new THREE.Vector3(at.x, EYE, at.z);
+    enterWalk(stand.clone().addScaledVector(ahead, -0.8), stand.addScaledVector(ahead, 1.5));
+    return;
+  }
+  const step = new THREE.Vector3(at.x - camera.position.x, 0, at.z - camera.position.z);
+  const stop = Math.min(0.8, step.length());
+  fly(new THREE.Vector3(at.x, EYE, at.z).addScaledVector(step.normalize(), -stop), null, camera.fov);
+}
+document.getElementById('viewGo').onclick = () => {
+  if (walk.isLocked) walk.unlock();     // the unlock handler presses this button
+  else enterLivingRoom();
+};
+document.getElementById('viewWalk').onclick = () => {
+  enterLivingRoom();
+  walk.lock();                          // needs this click's user gesture; if refused, point and go stays
+};
+function setLens(fov) {                // ease the lens over 0.5 s, or retarget a flight under way
+  if (flight) flight.fovTo = fov;
+  else fly(camera.position.clone(), null, fov, null, 500);
+}
+walk.addEventListener('lock', () => { pressView('viewWalk'); setLens(LOCKED_FOV); });
+walk.addEventListener('unlock', () => {  // Esc while captured
+  if (!walking) return;
+  pressView('viewGo');
+  setLens(WALK_FOV);
+});
 // Wheel while walking zooms the lens (narrower field of view), not the body.
 renderer.domElement.addEventListener('wheel', (e) => {
-  if (!walking) return;
+  if (!walking || flight) return;
   e.preventDefault();
   camera.fov = THREE.MathUtils.clamp(camera.fov * Math.exp(e.deltaY * (e.ctrlKey ? 0.01 : 0.001)), 15, 90);
   camera.updateProjectionMatrix();
 }, { passive: false });
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Escape' && walking && !planDlg.open) { exitWalk(); setView(false); }               // Esc while dragging
+  if (e.code === 'Escape' && walking && !walk.isLocked && !flight && !planDlg.open) leaveWalk();
 });
 
+// A press that moves more than 3 px is a drag (look, orbit, move furniture), not a click.
+const press = { x: 0, y: 0, moved: false };
 const look = new THREE.Euler(0, 0, 0, 'YXZ');
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  Object.assign(press, { x: e.clientX, y: e.clientY, moved: false });
+  marker.visible = false;
+});
 renderer.domElement.addEventListener('pointermove', (e) => {
-  if (!walking || walk.isLocked || e.buttons !== 1) return;
-  look.setFromQuaternion(camera.quaternion);
-  look.y += e.movementX * 0.004;
-  look.x = THREE.MathUtils.clamp(look.x + e.movementY * 0.004, -1.4, 1.4);
-  camera.quaternion.setFromEuler(look);
+  if (e.buttons && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 3) press.moved = true;
+  if (flight || drag || walk.isLocked) return;
+  if (e.buttons) {                      // drag the view: 0.0013 rad/px, pitch within ±60°
+    if (walking && e.buttons === 1 && press.moved) {
+      look.setFromQuaternion(camera.quaternion);
+      look.y += e.movementX * 0.0013;
+      look.x = THREE.MathUtils.clamp(look.x + e.movementY * 0.0013, -Math.PI / 3, Math.PI / 3);
+      camera.quaternion.setFromEuler(look);
+    }
+    return;
+  }
+  const at = floorAt(e);
+  marker.visible = at !== null;
+  if (!at) return;
+  marker.position.set(at.x, at.y + 0.01, at.z);
+  marker.scale.setScalar(Math.max(1, camera.position.distanceTo(at) / 5));   // same size on screen from afar
+});
+renderer.domElement.addEventListener('pointerleave', () => { marker.visible = false; });
+renderer.domElement.addEventListener('click', (e) => {
+  if (flight || press.moved || walk.isLocked) return;
+  const at = floorAt(e);
+  if (!at) return;
+  clearTimeout(goTimer);
+  if (walking) goTo(at);
+  else goTimer = setTimeout(() => goTo(at), 250);
 });
 
 const probe = new THREE.Raycaster();
@@ -1368,9 +1536,11 @@ function zoomPlan(f, cx, cy) {        // scale by f, keeping screen point (cx, c
   drawPlan();
 }
 const centre = () => [planView.clientWidth / 2, planView.clientHeight / 2];
+let relock = false;                   // the locked walk resumes when the viewer closes
 function openPlan() {
   if (planDlg.open) return;
   keys.clear();
+  relock = walk.isLocked;
   planHere.hidden = !walking;
   if (walking) {
     planHere.style.left = `${camera.position.x / M + OX}px`;
@@ -1378,11 +1548,11 @@ function openPlan() {
   }
   planDlg.showModal();
   fitPlan();
-  if (walk.isLocked) walk.unlock();   // free the mouse; the unlock handler keeps the walk going
+  if (relock) walk.unlock();          // free the mouse; the walk goes on as point and go meanwhile
 }
 planDlg.addEventListener('close', () => {
   keys.clear();
-  if (walking) walk.lock();           // back to looking around (drag to look if refused)
+  if (walking && relock) walk.lock(); // back to the locked walk (point and go if refused)
 });
 document.getElementById('openPlan').onclick = openPlan;
 document.getElementById('planClose').onclick = () => planDlg.close();
@@ -1451,7 +1621,7 @@ let drag = null;                      // { group, start, pointerId }
 // Capture phase on the container runs before OrbitControls' listener on the canvas, so a
 // press on a piece turns orbiting off for that gesture.
 app.addEventListener('pointerdown', (e) => {
-  if (walking || !furniture.visible || e.button !== 0) return;
+  if (walking || flight || !furniture.visible || e.button !== 0) return;
   rayAt(e);
   // First surface actually seen: walls block, walls above the cut height don't.
   const hit = pick.intersectObjects([walls, furniture], true).find((h) => h.point.y <= cutPlane.constant);
@@ -1592,11 +1762,14 @@ window.addEventListener('resize', () => {
   labelRenderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-setView(false);
+camera.position.set(7, 11, 13);       // the 3D view, around the centre of the plan
+controls.update();
+pressView('view3d');
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);
-  if (walking) walkStep(dt);
+  if (flight) flightStep(performance.now());
+  else if (walking) walkStep(dt);
   else controls.update();
   if (electric.visible) {          // bulbs hover gently in place
     const t = clock.elapsedTime;
