@@ -25,6 +25,8 @@ repo (see "Architecture" in the requirements doc):
 - `src/store.ts` — zustand store: house, baseline, undo/redo history, proposal.
 - `src/scene.ts` — raw Three.js (no R3F): `buildHouse(house)`, drag controller.
 - `src/pages/` — Entry (documents → review) and Editor.
+- `my-*-3d.html` + `sketch3d/` — standalone 3D sketch pages on a shared engine, outside the app;
+  work on them through the `sketch-3d` skill.
 
 ## Commands
 

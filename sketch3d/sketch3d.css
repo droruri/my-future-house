@@ -1,0 +1,95 @@
+/* sketch3d — shared look of the hand-sketch 3D viewers. The markup is built by sketch3d.js. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; background: #dfe6ee; font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+#app { position: fixed; inset: 0; }
+
+/* Labels (CSS2DRenderer). They aren't occluded by walls, so they hide while walking. */
+#labels { position: fixed; inset: 0; pointer-events: none; direction: ltr; }
+#labels > div { left: 0; top: 0; }
+#labels.walking, #labels.hidden .lbl, #labels.hidden .elbl { display: none; }
+.lbl { direction: rtl; text-align: center; color: #1e293b; text-shadow: 0 0 3px #fff, 0 0 6px #fff; white-space: nowrap; line-height: 1.2; }
+.lbl b { display: block; font-size: 13px; }
+.lbl span { font-size: 11px; color: #475569; }
+.lbl.outside b { color: #166534; }
+.lbl.common b { color: #64748b; font-weight: 500; }
+.elbl { font-size: 10px; line-height: 1.3; padding: 0 4px; border-radius: 6px; white-space: nowrap; background: rgba(255,255,255,0.85); color: #92400e; border: 1px solid #f59e0b; }
+.elbl.sw { color: #1e3a8a; border-color: #3b82f6; }
+.dim, .tag { display: inline-block; direction: rtl; font-size: 10px; line-height: 1.3; padding: 0 3px; border-radius: 4px; white-space: nowrap; background: rgba(255,255,255,0.9); color: #334155; border: 1px solid #94a3b8; }
+.dim.v { rotate: -90deg; }
+.dim.window, .dim.glass { color: #1d4ed8; border-color: #60a5fa; }
+.dim.door { color: #15803d; border-color: #4ade80; }
+.tag { color: #92400e; border-color: #f59e0b; font-size: 11px; }
+
+/* Panel */
+#panel {
+  position: fixed; top: 14px; right: 14px; width: 250px; padding: 14px;
+  max-height: calc(100dvh - 28px); overflow-y: auto;
+  background: rgba(255,255,255,0.92); backdrop-filter: blur(8px);
+  border-radius: 12px; box-shadow: 0 8px 24px rgba(15,23,42,0.15); color: #0f172a;
+}
+#panel h1 { font-size: 16px; margin-bottom: 2px; }
+#panel .sub { font-size: 12px; color: #64748b; margin-bottom: 12px; }
+#panel .group { display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: dense; gap: 6px; margin-bottom: 8px; }
+#panel button {
+  font: inherit; font-size: 13px; padding: 7px 6px; border-radius: 8px; cursor: pointer;
+  border: 1px solid #cbd5e1; background: #fff; color: #0f172a;
+}
+#panel button:hover { border-color: #3b82f6; }
+#panel button:disabled { opacity: 0.45; cursor: default; border-color: #cbd5e1; }
+#panel button[aria-pressed="true"] { background: #2563eb; border-color: #2563eb; color: #fff; }
+#panel #tEdit[aria-pressed="true"] { background: #d97706; border-color: #d97706; }
+#panel label { display: block; font-size: 12px; color: #475569; margin: 8px 0 4px; }
+#panel input[type=range] { width: 100%; margin-bottom: 8px; }
+#panel .wide { grid-column: 1 / -1; }
+#panel .hint { font-size: 11px; color: #94a3b8; margin-top: 10px; line-height: 1.5; }
+#panel .touchHint { display: none; }
+#editor { padding: 8px; border-radius: 8px; background: #fffbeb; border: 1px solid #fcd34d; font-size: 12px; margin-bottom: 8px; }
+#editor .group { margin: 6px 0 0; }
+#selName { font-weight: 600; }
+#selPos { color: #475569; margin-top: 2px; min-height: 1em; }
+#pending { margin-top: 10px; padding: 8px; border-radius: 8px; background: #eff6ff; font-size: 12px; }
+#pending .group { margin: 6px 0 0; }
+#saveStatus { font-size: 11px; color: #475569; margin-top: 6px; min-height: 1em; }
+body.dragging, body.dragging canvas { cursor: grabbing; }
+
+/* Full-screen sketch viewer: wheel / pinch zoom toward the cursor, drag to pan */
+#planDlg { position: fixed; inset: 0; width: 100vw; height: 100vh; max-width: none; max-height: none; border: 0; padding: 0; background: #f8fafc; direction: ltr; overflow: hidden; }
+#planDlg::backdrop { background: rgba(15,23,42,0.4); }
+#planView { position: absolute; inset: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none; }
+#planView.panning { cursor: grabbing; }
+#planStage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#planStage img { display: block; pointer-events: none; }
+#planHere { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #ef4444; border: 2px solid #fff; box-shadow: 0 0 0 4px rgba(239,68,68,0.3); }
+#planBar { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; direction: rtl; }
+#planBar button { font: inherit; font-size: 14px; min-width: 36px; padding: 7px 10px; border-radius: 8px; cursor: pointer; border: 1px solid #cbd5e1; background: #fff; color: #0f172a; box-shadow: 0 2px 8px rgba(15,23,42,0.12); }
+#planBar button:hover { border-color: #3b82f6; }
+#planHint { position: absolute; bottom: 12px; left: 50%; translate: -50% 0; direction: rtl; font-size: 12px; color: #475569; background: rgba(255,255,255,0.9); padding: 4px 10px; border-radius: 8px; }
+
+/* Mobile: the panel folds behind a menu button; touch devices get an on-screen walk pad */
+#menuBtn, #pad { display: none; }
+#menuBtn, #pad button {
+  font: inherit; font-size: 20px; width: 48px; height: 48px; border-radius: 12px; cursor: pointer;
+  border: 1px solid #cbd5e1; background: rgba(255,255,255,0.92); color: #0f172a;
+  box-shadow: 0 4px 12px rgba(15,23,42,0.15); touch-action: none; user-select: none; -webkit-user-select: none;
+}
+#pad { position: fixed; bottom: calc(16px + env(safe-area-inset-bottom)); left: 16px; grid-template-columns: repeat(3, 48px); gap: 6px; direction: ltr; }
+#pad .up { grid-area: 1 / 2; } #pad .left { grid-area: 2 / 1; } #pad .down { grid-area: 2 / 2; } #pad .right { grid-area: 2 / 3; }
+#pad .exit { grid-area: 1 / 3; font-size: 16px; }
+#pad button:active { background: #2563eb; color: #fff; }
+@media (pointer: coarse) {
+  #viewWalk { display: none; }
+  #panel .group button:has(+ #viewWalk) { grid-column: 1 / -1; }
+  body.walking #pad { display: grid; }
+  #panel .hint { display: none; }
+  #panel .touchHint { display: block; }
+}
+@media (max-width: 700px) {
+  #menuBtn { display: block; position: fixed; top: calc(10px + env(safe-area-inset-top)); right: 10px; z-index: 2; }
+  #panel {
+    top: calc(64px + env(safe-area-inset-top)); right: 10px; left: 10px; width: auto;
+    max-height: calc(100dvh - 80px - env(safe-area-inset-top)); display: none;
+  }
+  #panel.open { display: block; }
+  #panel button { padding: 10px 6px; font-size: 14px; }
+  #panel input[type=range] { height: 32px; }
+}

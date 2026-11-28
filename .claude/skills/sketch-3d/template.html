@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ROOM NAME — תלת-ממד</title>
+<link rel="stylesheet" href="sketch3d/sketch3d.css" />
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<!-- Approved edits: item id → { x, z } offset (world units) from where the code draws it, and rot
+     (degrees, counter-clockwise seen from above). Written by "שמירה" in edit mode. -->
+<script type="application/json" id="layout">{}</script>
+<script type="module">
+import { createSketch, THREE } from './sketch3d/sketch3d.js';
+
+// ---------------------------------------------------------------------------
+// Units: centimetres everywhere. Plan coordinates (x right, y down the sketch) are measured from
+// <reference corner>. Scale: <labelled length> over <measured span> = <cm per plan unit>.
+// ---------------------------------------------------------------------------
+const H = 260;                           // ceiling height
+const T = 10;                            // wall thickness
+
+// The original drawing. Image px → plan: (px − <left>, py − <top>) × CM_PER_PX.
+const SKETCH_SRC = 'data:image/jpeg;base64,REPLACE_WITH_SCRIPT';
+const PHOTO_W = 1500, PHOTO_H = 2000, CM_PER_PX = 0.28, LEFT = 300, TOP = 460;
+
+const sk = createSketch({
+  title: 'ROOM NAME',
+  perMetre: 100,
+  plan: { origin: [150, 170] },          // a plan point near the middle
+  height: H,
+  sketch: {
+    src: SKETCH_SRC,
+    size: [PHOTO_W, PHOTO_H],
+    rect: [-LEFT * CM_PER_PX, -TOP * CM_PER_PX, (PHOTO_W - LEFT) * CM_PER_PX, (PHOTO_H - TOP) * CM_PER_PX],
+  },
+  view3d: [260, 620, 480],               // 3D-view camera; the top view is derived from it
+  start: { at: [150, 250], look: [150, 50] },   // "הצבע ולך" entry point and gaze (plan)
+  shadowExtent: 400,                     // half-width of the sun's shadow box: covers the model
+  notes: ['כל המידות בס"מ. מידות שלא נכתבו בשרטוט נמדדו ממנו או נלקחו ממידות סטנדרטיות.'],
+});
+const { mat, box, rect, target, hWall, vWall } = sk;
+const MAT = {
+  ...sk.MAT,
+  floor: mat(0xe7e2da, { roughness: 0.5 }),
+  wood: mat(0xc9a77c, { roughness: 0.6 }),
+};
+
+// ---------------------------------------------------------------------------
+// Walls: one call per piece, split at every opening
+// ---------------------------------------------------------------------------
+hWall(0, -5, 305, T);                    // north
+vWall(300, 0, 300, T);                   // east
+hWall(300, -5, 100, T);                  // south, then the door
+hWall(300, 100, 180, T, 'door', { head: 205 });
+hWall(300, 180, 305, T);
+vWall(0, 0, 300, T);                     // west, with a window
+// vWall(0, 100, 200, T, 'window', { sill: 90, head: 210 });
+
+// ---------------------------------------------------------------------------
+// Floors + labels
+// ---------------------------------------------------------------------------
+const area = sk.addRooms([{ name: 'ROOM NAME', poly: rect(0, 0, 300, 300), mat: MAT.floor }]);
+sk.setSubtitle(`שטח רצפה ≈ ${area.toFixed(1)} מ"ר · כל המידות בס"מ`);
+
+// ---------------------------------------------------------------------------
+// Items: everything movable. Local frame (cm): x across, z out from the wall it backs onto,
+// y up; `at` places it on the plan, `rot` turns it (0 faces plan south, 90 east).
+// ---------------------------------------------------------------------------
+const lb = (x1, z1, x2, z2, y0, y1, m) => {
+  const o = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(x2 - x1), y1 - y0, Math.abs(z2 - z1)), m);
+  o.position.set((x1 + x2) / 2, (y0 + y1) / 2, (z1 + z2) / 2);
+  o.castShadow = o.receiveShadow = true;
+  target().add(o);
+  return o;
+};
+// <Product, model>: 120 × 60 × 75 (published) — or "read off the sketch" / "assumed".
+sk.item('desk', { name: 'שולחן כתיבה', at: [150, 0], rot: 0, tag: 'שולחן 120 × 60 × 75', tagAt: [0, 90, 30] }, () => {
+  lb(-60, 0, 60, 60, 72, 75, MAT.wood);
+  for (const x of [-57, 54]) for (const z of [3, 54]) lb(x, z, x + 3, z + 3, 0, 72, MAT.wood);
+});
+
+// ---------------------------------------------------------------------------
+// Page toggles, then start
+// ---------------------------------------------------------------------------
+sk.toggle('ריהוט', true, (on) => { sk.furniture.visible = on; });
+sk.start();
+</script>
+</body>
+</html>
